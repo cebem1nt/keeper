@@ -151,190 +151,223 @@ def auth(keeper: Keeper) -> str:
     Default funciton for console password prompt
     """
     while True:
-        passphrase = getpass("Passphrase: ")
+        passphrase = getpass("\033[95mPassphrase: \033[0m")
 
         if keeper.verify_passphrase(passphrase):
             return passphrase
         else:
-            print('Incorrect passphrase, try again')
+            print('\033[31mIncorrect passphrase, try again\033[0m')
     
 
-def registrate() -> str:
+def registrate(current_locker: str) -> str:
     """
     Default function for registration, creating passphrase
     """
+
+    print("""
+       \033[36m/\\ /\\___  \033[35m___ _ __   ___ _ __ 
+      \033[36m/ //_/ _ \\\033[35m/ _ \\ '_ \\ / _ \\ '__|
+     \033[36m/ __ \\  __/\033[35m  __/ |_) |  __/ |   
+     \033[36m\\/  \\/\\___|\033[35m\\___| .__/ \\___|_|   
+                \033[35m |_|              
+""")
+
+    print("Current locker: ", current_locker + '\n')
+
     while True:
-        passphrase = getpass("Create passphrase: ")
+        passphrase = getpass("\033[32mCreate passphrase: \033[0m")
 
         if len(passphrase) < 3:
-            print("Passphrase is too short")
+            print("\033[31mPassphrase is too short\033[0m")
             continue
 
-        repeated = getpass("Repeat passphrase: ")
+        repeated = getpass("\033[32mRepeat passphrase: \033[0m")
 
         if passphrase == repeated:
-            print("Passphrase created")
+            print("\033[32mPassphrase created\033[0m")
             return passphrase
 
 def print_triplet(triplet: tuple, hidden_password=True):
-    print('')
-    print('Tag:', triplet[0])
-    print('Login:', triplet[1])
+    print('\n\033[34mTag:', triplet[0] + '\033[0m')
+    print('\033[36mLogin:', triplet[1] + '\033[0m')
 
     if not hidden_password:
-        print('Password:', triplet[2])
+        print('\033[35mPassword:', triplet[2] + '\033[0m')
 
 def main(args: ArgumentParser):
     # Initialize the Keeper instance
     keeper = Keeper(FileSystem(), CryptoSystem())
     
     try:
+        if args.print_locker:
+            print(f"\n\033[32mCurrent locker: \033[36m{keeper.get_current_locker()}\n\033[0m")
+            return
+
+        if args.change_locker:
+            locker_dir = args.change_locker
+            try:
+                keeper.change_locker(locker_dir)
+                print(f'\n\033[32mSuccesfuly changed current locker to : {locker_dir}\033[0m\n')
+            except:
+                print(f"\n\033[31mCould not find locker dir: {locker_dir}\033[0m\n")
+                
+            return
+
         if not keeper.passphrase_exist():
-            passphrase = registrate()
+            passphrase = registrate(keeper.get_current_locker())
             keeper.set_passphrase(passphrase)
 
         else:
             passphrase = auth(keeper)
 
+        keeper.set_cipher(passphrase)
+        triplets = keeper.get_triplets()
+
+        if args.add:
+            print("\033[34mA tag is a label used to identify your password in the storage system. When you need to find a specific password and login, you can search by its tag.")
+            tag = input("\033[34mEnter the tag: ")
+            login = input("\033[36mEnter the login: ")
+            password = input("\033[35mEnter the password: ")
+
+            keeper.store_triplet(tag, login, password)
+            print(f"\033[32mTriplet successfully stored with the tag: {tag}\033[0m")
+
+        if args.list:
+            for triplet in triplets:
+                print_triplet(triplet)
+            print('')        
+
+        if args.list_shown:
+            for triplet in triplets:
+                print_triplet(triplet, hidden_password=False)
+            print('')
+
+        if args.reset_locker:
+            choice = input("\033[31mAre you sure you want to reset all the data? [y/N] \033[0m")
+
+            if 'y' == choice.lower():
+                keeper.reset()
+                print('\033[32mData reseted\033[0m')
+                return
+
+            else:
+                print('\033[32mAboarting..\033[0m')
+
+        if args.get_strict:
+            tag = ' '.join(args.get_strict)
+            matches = keeper.get_triplet_by_tag(triplets, tag)
+
+            for triplet in matches:
+                print_triplet(triplet, hidden_password=False)
+            print('')
+
+        if args.get_password:
+            tag = ' '.join(args.get_password)
+            matches = keeper.get_triplet_by_tag(triplets, tag)
+
+            if not len(matches):
+                print(f"\033[31mCould not find triplet with tag: {tag}\033[0m")
+                return
+
+            for triplet in matches:
+                print(triplet[2])
+
+        if args.get_login:
+            tag = ' '.join(args.get_login)
+            matches = keeper.get_triplet_by_tag(triplets, tag)
+
+            if not len(matches):
+                print(f"\033[31mCould not find triplet with tag: {tag}\033[0m")
+                return
+
+            for triplet in matches:
+                print(triplet[1])
+
+        if args.get_easy:
+            tag = ' '.join(args.get_easy)
+
+            matches = keeper.get_triplet_by_tag(triplets, tag, False)
+
+            for triplet in matches:
+                print_triplet(triplet, hidden_password=False) 
+            print('')
+
+        if args.remove_by_tag:
+            tag = ' '.join(args.remove_by_tag)
+
+            match = keeper.get_triplet_by_tag(triplets, tag)
+
+            if not len(match):
+                print(f"\033[31mCould not find triplet with tag: {tag}\033[0m")
+                return
+
+            print('\033[31m')
+            print_triplet(match[0], hidden_password=False) 
+
+            remove = input("Delete this triplet? [y/N] ")
+
+            if 'y' == remove.lower():
+                keeper.remove_triplet(triplets.index(match[0]))
+                print('\033[32mTriplet deleted\033[0m')
+            else:
+                print('\033[32mAboarting..\033[0m')
+
+        if args.edit:
+            for triplet in triplets:
+                print_triplet(triplet)
+            print('')  
+            
+            while True:
+                tag = input("Enter the tag: ")
+                triplet = keeper.get_triplet_by_tag(triplets, tag)
+
+                if not len(triplet):
+                    print(f"\033[31mCould not find triplet with tag: {tag}\033[0m")
+                    cont = input("\033[32mWould you like to try again? [y/N]\033[0m")
+
+                    if 'y' == cont.lower():
+                        continue
+                    else:
+                        print('\033[32mAboarting..\033[0m')
+
+                triplet = triplet[0]
+
+                print("\033[32mParameters that can be edited: \n 0 - tag \n 1 - login \n 2 - password\033[0m")
+
+                while True:
+                    try:
+                        param = int(input("\033[32mEnter the parameter to edit (0-2): "))
+
+                    except:
+                        param = -1
+
+                    if param in (0, 1, 2):
+                        break
+
+                    else:
+                        print("\033[31mIncorrect parameter\033[0m")
+
+                names = ('tag', 'login', 'password')
+                value = input(f"\033[32mEnter new value for {names[param]}:\033[0m")
+
+                keeper.edit_triplet_property(triplets, triplet, param, value)
+                print(f"\033[32mSuccesfully edited triplet with tag: {tag}\033[0m")
+
+        if args.dump:
+            dest = args.dump
+
+            try:
+                keeper.dump(dest)
+                print(f'\033[32mSuccesfuly dumped current locker to : {dest}\033[0m')
+
+            except:
+                print(f"\033[31mCould not find destination dir: {dest}\033[0m")
+        
     except KeyboardInterrupt:
         return
 
-    keeper.set_cipher(passphrase)
-    triplets = keeper.get_triplets()
-
-    if args.add:
-        print("A tag is a label used to identify your password in the storage system. When you need to find a specific password and login, you can search by its tag.")
-        tag = input("Enter the tag: ")
-        login = input("Enter the login: ")
-        password = input("Enter the password: ")
-
-        keeper.store_triplet(tag, login, password)
-        print(f"Triplet successfully stored with the tag: {tag}")
-
-    if args.list:
-        for triplet in triplets:
-            print_triplet(triplet)
-        print('')        
-
-    if args.list_shown:
-        for triplet in triplets:
-            print_triplet(triplet, hidden_password=False)
-        print('')
-
-    if args.reset_locker:
-        choice = input("\033[31mAre you sure you want to reset all the data? [y/N] \033[0m")
-
-        if 'y' == choice.lower():
-            keeper.reset()
-            print('Data reseted')
-            return
-
-        else:
-            print('Aboarting..')
-
-    if args.get_strict:
-        tag = ' '.join(args.get_strict)
-        matches = keeper.get_triplet_by_tag(triplets, tag)
-
-        for triplet in matches:
-            print_triplet(triplet, hidden_password=False)
-        print('')
-
-    if args.get_easy:
-        tag = ' '.join(args.get_easy)
-
-        matches = keeper.get_triplet_by_tag(triplets, tag, False)
-
-        for triplet in matches:
-            print_triplet(triplet, hidden_password=False) 
-        print('')
-
-    if args.remove_by_tag:
-        tag = ' '.join(args.remove_by_tag)
-
-        match = keeper.get_triplet_by_tag(triplets, tag)
-
-        if not len(match):
-            print(f"Could not find triplet with tag: {tag}")
-            return
-
-        print('\033[31m')
-        print_triplet(match[0], hidden_password=False) 
-        print('\033[0m')
-
-        remove = input("Delete this triplet? [y/N] ")
-
-        if 'y' == remove.lower():
-            keeper.remove_triplet(triplets.index(match[0]))
-            print('Triplet deleted')
-        else:
-            print('Aboarting..')
-
-    if args.edit:
-        for triplet in triplets:
-            print_triplet(triplet)
-        print('')  
-        
-        while True:
-            tag = input("Enter the tag: ")
-            triplet = keeper.get_triplet_by_tag(triplets, tag)
-
-            if not len(triplet):
-                print(f"Could not find triplet with tag: {tag}")
-                cont = input("Would you like to try again? [y/N] ")
-
-                if 'y' == cont.lower():
-                    continue
-                else:
-                    print('Aboarting..')
-
-            triplet = triplet[0]
-
-            print("Parameters that can be edited: \n 0 - tag \n 1 - login \n 2 - password")
-
-            while True:
-                try:
-                    param = int(input("Enter the parameter to edit (0-2): "))
-
-                except:
-                    param = -1
-
-                if param in (0, 1, 2):
-                    break
-                else:
-                    print("Incorrect parameter")
-
-            value = input("Enter new value: ")
-
-            keeper.edit_triplet_property(triplets, triplet, int(param), value)
-            
-            print(f"Succesfully edited triplet with tag: {tag}")
-
-    if args.dump:
-        dest = args.dump
-
-        try:
-            keeper.dump(dest)
-            print(f'Succesfuly dumped current locker to : {dest}')
-
-        except:
-            print(f"Could not find destination dir: {dest}")
-
-    if args.print_locker:
-        print(f"\nCurrent locker: {keeper.get_current_locker()}\n")
-
-    if args.change_locker:
-        locker_dir = args.change_locker
-        try:
-            keeper.change_locker(locker_dir)
-            print(f'Succesfuly changed current locker to : {locker_dir}')
-        except:
-            print(f"Could not find locker dir: {locker_dir}")
-            
-        return
-
 if __name__ == '__main__':
-    p = ArgumentParser(description="Keeper is a Python password manager")
+    p = ArgumentParser(description="Keeper is a Python password manager. Locker is a directory where passwords are stored, triplet is tag/login/password")
 
     p.add_argument('-a', '--add', action='store_true',
                     help='Interactively adds tag/login/password')
@@ -354,6 +387,12 @@ if __name__ == '__main__':
     p.add_argument('-g', '--get-strict', metavar=('<tag>'), type=str, nargs='+',
                    help='Gets a tag/password/login triplet based on tag')
     
+    p.add_argument('-gp', '--get-password', metavar=('<tag>'), type=str, nargs='+',
+                   help='Gets a password based on tag')
+    
+    p.add_argument('-gl', '--get-login', metavar=('<tag>'), type=str, nargs='+',
+                   help='Gets a login based on tag')
+
     p.add_argument('-ge', '--get-easy', metavar=('<tag>'), type=str, nargs='+',
                    help='Based on tag, gets all tag/password/login triplets with similar tags')
         

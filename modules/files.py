@@ -12,7 +12,7 @@ class FileSystem:
 
         self.init_locker()
 
-        self.storage = os.path.join(self.locker_dir, 'storage.txt')
+        self.storage = os.path.join(self.locker_dir, 'storage')
         self.hash = os.path.join(self.locker_dir, '.hash')
         self.salt = os.path.join(self.locker_dir, '.salt')
 
