@@ -336,7 +336,7 @@ def main(args: ArgumentParser):
 
                 while True:
                     try:
-                        param = int(input("\033[32mEnter the parameter to edit (0-2): "))
+                        param = int(input("\033[32mEnter the parameter to edit (0-2): \033[0m"))
 
                     except:
                         param = -1
@@ -348,10 +348,11 @@ def main(args: ArgumentParser):
                         print("\033[31mIncorrect parameter\033[0m")
 
                 names = ('tag', 'login', 'password')
-                value = input(f"\033[32mEnter new value for {names[param]}:\033[0m")
+                value = input(f"\033[32mEnter new value for {names[param]}: \033[0m")
 
                 keeper.edit_triplet_property(triplets, triplet, param, value)
                 print(f"\033[32mSuccesfully edited triplet with tag: {tag}\033[0m")
+                break
 
         if args.dump:
             dest = args.dump
