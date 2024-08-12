@@ -21,67 +21,82 @@ class Keeper:
         """
         passphrase_bytes = passphrase.encode()
 
-        salt = self.fs.get_content('salt')
+        salt = self.fs.get_from_locker('salt')
 
         if not salt:
-            salt = self.cs.generate_salt()
-            self.fs.set_content('salt', salt)
+            self.fs.set_to_locker(self.cs.generate_salt())
 
         key = derive_key(passphrase_bytes, salt)
 
         self.cipher = self.cs.get_cipher(key)
 
+    def set_salt(self):
+        self.fs.set_to_locker(self.cs.generate_salt())
+
     def passphrase_exist(self):
         """
         Checks is passphrase already exists
         """
-        return self.fs.hash_exists()
-    
-    def set_passphrase(self, passphrase: str):
-        """
-        Hashes password and writes it to hash.txt
-        """
-        passphrase_hash = self.cs.hash_data(passphrase)
-        self.fs.set_content('hash', passphrase_hash)
+        return self.fs.salt_exists()
 
     def verify_passphrase(self, passphrase: str):
         """
-        Verifies correctness of stored passphrase with given
+        Verifies correctness of given passphrase
         """
-        original_hash = self.fs.get_content('hash').strip()
-        return self.cs.verify_hash(original_hash, passphrase)
+        try:
+            self.set_cipher(passphrase)
+            self.get_triplets()
+            return True
+        except Exception as e:
+            raise e
+
+    def __escape_brackets(self, text: str) -> str:
+        """
+        Escapes brackets in the text to avoid formatting issues.
+        """
+        return text.replace("]", "/]").replace("[", "/[")
 
     def get_triplets(self):
         """
-        Returns a list of tuples with nametag, login, password  triplets
+        Returns a list of tuples containing nametag, login, and password triplets.
         """
-        encrypted_storage = self.fs.get_content('storage').splitlines()
+        encrypted_storage_lines = self.fs.get_from_locker('storage').decode().splitlines()
+        
         pattern = r'\[\s*([^\]]+?)\s*\]'
         triplets = []
 
         if self.cipher is None:
             raise ValueError("No cipher found.")
 
-        for line in encrypted_storage:
+        for line in encrypted_storage_lines:
             decrypted_line = self.cs.decrypt(self.cipher, line).rstrip('\n')
-            mathces = re.findall(pattern, decrypted_line)
-            triplets.append((mathces[0], mathces[1], mathces[2]))
+            decrypted_line = decrypted_line.replace("/]", "]").replace("/[", "[")
+            
+            matches = re.findall(pattern, decrypted_line)
+            
+            if len(matches) == 3:
+                triplets.append((matches[0], matches[1], matches[2]))
 
-        return triplets 
+            else:
+                raise ValueError(f"Unexpected Matching error")
 
-    def store_triplet(self, p_nametag: str, p_login: str, p_password: str):
+        return triplets
+
+    def store_triplet(self, tag: str, login: str, password: str):
         """
-        Gets nametag, login and password. Creates a formated line, 
-        encrypts it and stores in storage
+        Stores a formatted triplet (nametag, login, password) in the storage after encryption.
         """
-
         if self.cipher is None:
             raise ValueError("No cipher found.")
 
-        password_line = f"[ {p_nametag} ] [ {p_login} ] [ {p_password} ]"
+        tag = self.__escape_brackets(tag)
+        login = self.__escape_brackets(login)
+        password = self.__escape_brackets(password)
 
-        encrypted_password_line = self.cs.encrypt(self.cipher, password_line)
-        self.fs.set_content('storage', encrypted_password_line)
+        formatted_line = f"[ {tag} ] [ {login} ] [ {password} ]"
+
+        encrypted_line = self.cs.encrypt(self.cipher, formatted_line) + '\n'
+        self.fs.set_to_locker(encrypted_line.encode(), set_salt=False)
 
     def get_triplet_by_tag(self, triplets_list: list[tuple], tag: str, strict=True):
         """
@@ -123,15 +138,15 @@ class Keeper:
         """
         edited_triplet = list(triplet)
         edited_triplet[property] = value
-        n, l, p = edited_triplet
+        t, l, p = edited_triplet
         self.remove_triplet(triplets_list.index(triplet))
-        self.store_triplet(n, l, p)
+        self.store_triplet(t, l, p)
 
-    def dump(self, destination: str):
+    def copy_locker(self, destination: str):
         """
-        Dumps current locker to the specified dir
+        Copies current locker to the specified dir
         """
-        self.fs.dump_locker(destination)
+        self.fs.copy_locker(destination)
 
     def change_locker(self, locker_dir: str):
         """
@@ -148,7 +163,7 @@ class Keeper:
 
 def auth(keeper: Keeper) -> str:
     """
-    Default funciton for console password prompt
+    Default funciton for console password prompt auth
     """
     while True:
         passphrase = getpass("\033[95mPassphrase: \033[0m")
@@ -169,7 +184,7 @@ def registrate(current_locker: str) -> str:
       \033[36m/ //_/ _ \\\033[35m/ _ \\ '_ \\ / _ \\ '__|
      \033[36m/ __ \\  __/\033[35m  __/ |_) |  __/ |   
      \033[36m\\/  \\/\\___|\033[35m\\___| .__/ \\___|_|   
-                \033[35m |_|              
+                   \033[35m |_|              
 """)
 
     print("Current locker: ", current_locker + '\n')
@@ -215,7 +230,7 @@ def main(args: ArgumentParser):
 
         if not keeper.passphrase_exist():
             passphrase = registrate(keeper.get_current_locker())
-            keeper.set_passphrase(passphrase)
+            keeper.set_salt()
 
         else:
             passphrase = auth(keeper)
@@ -304,7 +319,7 @@ def main(args: ArgumentParser):
             print('\033[31m')
             print_triplet(match[0], hidden_password=False) 
 
-            remove = input("Delete this triplet? [y/N] ")
+            remove = input("\033[31mDelete this triplet? [y/N] \033[0m")
 
             if 'y' == remove.lower():
                 keeper.remove_triplet(triplets.index(match[0]))
@@ -348,7 +363,7 @@ def main(args: ArgumentParser):
                         print("\033[31mIncorrect parameter\033[0m")
 
                 names = ('tag', 'login', 'password')
-                value = input(f"\033[32mEnter new value for {names[param]}: \033[0m")
+                value = input(f'\033[32mEnter new value for "{names[param]}": \033[0m')
 
                 keeper.edit_triplet_property(triplets, triplet, param, value)
                 print(f"\033[32mSuccesfully edited triplet with tag: {tag}\033[0m")

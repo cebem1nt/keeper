@@ -1,4 +1,4 @@
-import hashlib, base64, os
+import base64, os
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -19,21 +19,6 @@ class CryptoSystem:
         """
         return Fernet(key)
 
-    def hash_data(self, data: str):
-        """
-        Recieves data and returns it's hash
-        """
-        sha256 = hashlib.sha256()
-        sha256.update(data.encode())
-        return sha256.hexdigest()
-
-    def verify_hash(self, original_hash: str, new_data: str):
-        """
-        Gets hashed string, and normal string. Hashes
-        data and verifies are they equal
-        """
-        return original_hash == self.hash_data(new_data)
-
     def encrypt(self, cipher: Fernet, data: str):
         """
         Gets data and Fernet instance.
@@ -41,7 +26,7 @@ class CryptoSystem:
         """
         return cipher.encrypt(data.encode()).decode()
 
-    def decrypt(self, cipher: Fernet, encrypted_data: str):
+    def decrypt(self, cipher: Fernet, encrypted_data: bytes):
         """
         Gets encrypted data and a Fernet instance. 
         returns decrypted data
