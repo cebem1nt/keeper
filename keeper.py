@@ -47,8 +47,9 @@ class Keeper:
             self.set_cipher(passphrase)
             self.get_triplets()
             return True
-        except Exception as e:
-            raise e
+        
+        except:
+            return False
 
     def __escape_brackets(self, text: str) -> str:
         """
@@ -373,7 +374,7 @@ def main(args: ArgumentParser):
             dest = args.dump
 
             try:
-                keeper.dump(dest)
+                keeper.copy_locker(dest)
                 print(f'\033[32mSuccesfuly dumped current locker to : {dest}\033[0m')
 
             except:
@@ -413,7 +414,7 @@ if __name__ == '__main__':
                    help='Based on tag, gets all tag/password/login triplets with similar tags')
         
     p.add_argument('-du', '--dump', type=str, metavar=('<dir>'),
-                   help='Dumps current keeper storage to specified dir')
+                   help='Dumps current locker to specified dir')
 
     p.add_argument('-cl', '--change-locker', type=str, metavar=('<dir>'),
                    help='Sets another directory with triplets (locker) to manipulate them. Default locker dir: ~/.keeper/default_locker.')
