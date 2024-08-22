@@ -1,4 +1,4 @@
-import os
+import os, random
 from shutil import copy
 
 class FileSystem:
@@ -6,8 +6,10 @@ class FileSystem:
     Class for file manipulatoions with password manager file system
     """
 
-    def __init__(self, dir='~/.keeper') -> None:
+    def __init__(self, dir='~/.local/share/keeper') -> None:
         self.root_dir = os.path.expanduser(dir)
+        os.makedirs(self.root_dir, exist_ok=True)
+
         self.current_locker = os.path.join(self.root_dir, '.current_locker') # file with selected locker path
 
         self.init_locker()
@@ -16,8 +18,7 @@ class FileSystem:
         """
         Ensure that required directories and files exist.
         """
-        # making all the basic dirs
-        os.makedirs(self.root_dir, exist_ok=True)
+        # making the basic locker if it doesn't exist
 
         if not os.path.exists(self.current_locker):
             with open(self.current_locker, 'w'):
@@ -40,31 +41,24 @@ class FileSystem:
         Check if the salt exists. Used to identify is the first run
         """
         try:
-            return bool(self.get_from_locker('salt'))
+            return bool(self.get_from_locker())
             
         except:
             return False
 
-    def get_from_locker(self, param: str) -> bytes | tuple[bytes] :
+    def get_from_locker(self, get_salt=True) -> bytes :
         """
-        Reads content based on param from current locker. 
-          Params: 
-          - 'salt' : returns salt
-          - 'storage' : returns storage lines
-          - 'all' : returns both (salt, storage)
+        Reads content based on param from current locker.
         """
         
         with open(self.locker, 'rb') as f:
             salt = f.read(16)
             storage = f.read()
 
-        res = {
-            'salt' : salt,
-            'storage' : storage,
-            'all': (salt, storage)
-        }
+        if get_salt:
+            return salt
 
-        return res[param]
+        return storage
 
     def set_to_locker(self, value: bytes, set_salt=True) -> None :
         """
@@ -81,10 +75,10 @@ class FileSystem:
 
     def remove_from_storage(self, index: int) -> None:
         """
-        Remove a triplet line at specified index from the locker file.
+        Remove a line at specified index from the locker file.
         """
 
-        storage_lines = self.get_from_locker('storage').decode().split('\n')
+        storage_lines = self.get_from_locker(False).decode().split('\n')
 
         if 0 <= index < len(storage_lines):
             storage_lines.pop(index)
@@ -93,7 +87,7 @@ class FileSystem:
             raise IndexError("Index out of range")
 
         edited_lines = '\n'.join(storage_lines).lstrip('\n').encode()
-        salt = self.get_from_locker('salt')
+        salt = self.get_from_locker()
 
         with open(self.locker, 'wb') as f:
             f.write(salt + edited_lines)
@@ -128,6 +122,19 @@ class FileSystem:
 
     def suicide(self):
         """
-        Removes current locker
+        Shreds current locker and removes it
         """
-        os.remove(self.locker)
+        try:
+            with open(self.locker, 'r+b') as f:
+                file_size = os.path.getsize(self.locker)
+                
+                for _ in range(2):
+                    f.seek(0)
+                    f.write(bytearray(random.getrandbits(8) for _ in range(file_size)))
+                
+                f.truncate()
+            
+            os.remove(self.locker)
+    
+        except Exception as e:
+            raise e

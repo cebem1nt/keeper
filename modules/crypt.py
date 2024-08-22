@@ -1,4 +1,4 @@
-import base64, os
+import base64, os, random, string
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -9,9 +9,6 @@ class CryptoSystem:
     Cryptography class for encrypting / decrypting passwords, hashing 
     and other cryptography manipulations 
     """
-    def __init__(self) -> None:
-        pass
-
     def get_cipher(self, key: bytes):
         """
         Gets key as bytes and returns Fernet instance for
@@ -38,6 +35,36 @@ class CryptoSystem:
         Generates a random 16-byte salt.
         """
         return os.urandom(16)
+    
+    def generate_password(self, length: int, is_no_special_symbols: bool, 
+                          is_no_letters: bool):
+
+        """
+        Based on options, generates random password
+        """
+
+        letters = string.ascii_letters
+        digits = string.digits
+        special_symbols = string.punctuation
+        
+        # Determine the character set to use
+        if is_no_special_symbols and is_no_letters:
+            chars = digits
+        elif is_no_special_symbols:
+            chars = letters + digits
+        elif is_no_letters:
+            chars = digits + special_symbols
+        else:
+            chars = letters + digits + special_symbols
+        
+        if not chars:
+            raise ValueError("Character set is empty. Cannot generate a password.")
+
+        password = ''.join(random.choice(chars) for _ in range(length))
+        
+        return password
+          
+
         
 def derive_key(passphrase: bytes, salt: bytes):
     """
