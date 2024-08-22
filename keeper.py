@@ -1,7 +1,7 @@
 from modules.crypt import CryptoSystem, derive_key
 from modules.files import FileSystem
 from argparse import ArgumentParser
-import re
+import re, pyperclip
 from getpass import getpass
 
 def red(string: str) -> str:
@@ -9,6 +9,9 @@ def red(string: str) -> str:
 
 def green(string: str) -> str:
     return "\033[32m" + string + "\033[0m"
+
+def blue(string: str) -> str:
+    return "\033[34m" + string + "\033[0m"
 
 class Keeper:
     """
@@ -148,7 +151,7 @@ class Keeper:
         edited_triplet = list(triplet)
         edited_triplet[property] = value
         t, l, p = edited_triplet
-        self.remove_triplet(self.triplets.index(triplet))
+        self.remove_triplet(triplet)
         self.store_triplet(t, l, p)
 
     def copy_locker(self, destination: str):
@@ -181,8 +184,16 @@ def auth(keeper: Keeper) -> str:
     """
     Default funciton for console password prompt auth
     """
+
+    current_locker = f"[{'/'.join(keeper.get_current_locker().split('/')[-2:])}]"
+
+    if current_locker == '[keeper/default.lk]':
+        current_locker = ''
+
+    current_locker = blue(current_locker)
+
     while True:
-        passphrase = getpass("\033[95mPassphrase: \033[0m")
+        passphrase = getpass(f"\033[95mPassphrase: {current_locker} \033[0m")
 
         if keeper.init_keeper(passphrase):
             return
@@ -191,7 +202,7 @@ def auth(keeper: Keeper) -> str:
             print(red("Incorrect passphrase, try again"))
     
 
-def registrate(current_locker: str, keeper: Keeper):
+def registrate(keeper: Keeper):
     """
     Default function for registration, creating passphrase
     """
@@ -213,7 +224,7 @@ def registrate(current_locker: str, keeper: Keeper):
 
     print("\033[31m[WARNING!] Make sure to remember this passphrase, as losing it means you will not be able to recover your encrypted passwords.\033[0m\n")
 
-    print("\033[35mCurrent locker: ", current_locker + '\033[0m\n')
+    print("\033[35mCurrent locker: ", keeper.get_current_locker() + '\033[0m\n')
 
     while True:
         passphrase = getpass("\033[32mCreate passphrase for the locker: \033[0m")
@@ -287,25 +298,35 @@ def get(tag: str, keeper: Keeper):
     matches = keeper.get_triplets_by_tag(tag)
     list_triplets(matches, False)
 
-def get_password(tag: str, keeper: Keeper):
+def get_password(tag: str, keeper: Keeper, no_clipboard=False):
     matches = keeper.get_triplets_by_tag(tag)
 
     if not len(matches):
         print(red(f'Could not find triplet with tag: {tag}'))
         return
 
-    for triplet in matches:
+    triplet = matches[0]
+    
+    if no_clipboard:
         print(triplet[2])
+    else:
+        print(green("Password added to the clipboard!"))
+        pyperclip.copy(triplet[2])
 
-def get_login(tag: str,  keeper: Keeper):
+def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
     matches = keeper.get_triplets_by_tag(tag)
 
     if not len(matches):
         print(red(f'Could not find triplet with tag: {tag}'))
         return
 
-    for triplet in matches:
+    triplet = matches[0]
+
+    if no_clipboard:
         print(triplet[1])
+    else:
+        print(green("Login added to the clipboard!"))
+        pyperclip.copy(triplet[1])
 
 def search(tag: str, do_show: bool, keeper: Keeper):
     matches = keeper.get_triplets_by_tag(tag, False)
@@ -334,7 +355,7 @@ def remove_by_tag(tag: str, keeper: Keeper):
 def edit(tag: str, keeper: Keeper):
     triplets = keeper.get_triplets_by_tag(tag)
 
-    if not len(triplet):
+    if not len(triplets):
         print(red(f"Could not find triplet with tag: {tag}"))
         return
 
@@ -358,13 +379,13 @@ def edit(tag: str, keeper: Keeper):
     value = input(f'\033[32mEnter new value for "{('tag', 'login', 'password')[param]}": \033[0m')
 
     keeper.edit_triplet_property(triplet, param, value)
-    print(f"\033[32mSuccesfully edited triplet with tag: {tag}\033[0m")
+    print(green(f'Succesfully edited triplet with tag: "{tag}"'))
 
 def dump(dest: str, keeper: Keeper):
 
     try:
         keeper.copy_locker(dest)
-        print(f'\033[32mSuccesfuly copied current locker to : {dest}\033[0m')
+        print(f'\033[32mSuccesfuly copied current locker to "{dest}"\033[0m')
 
     except:
         print(f"\033[31mCould not find destination dir: {dest}\033[0m")
@@ -377,64 +398,63 @@ def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool
 
 
 def main(args: ArgumentParser):
-    # Initialize the Keeper instance
     keeper = Keeper(FileSystem(), CryptoSystem())
     
     try:
 
+        if args.command == 'change':
+            change_locker(args.dir, keeper)
+            return 
+        
+        elif args.command == 'current':
+            print_locker(keeper)
+            return
+        
+        elif args.command == 'dump':
+            dest = args.dir if args.dir else '.'
+            dump(dest, keeper)
+            return
+
         if not keeper.passphrase_exist():
-            registrate(keeper.get_current_locker(), keeper)
+            registrate(keeper)
 
         else:
             auth(keeper)
 
         if args.command == 'add':
-            add_triplet(' '.join(args.tag), keeper, args.show_password)
+            add_triplet(args.tag, keeper, args.show_password)
 
         elif args.command == 'remove':
-            remove_by_tag(' '.join(args.tag), keeper)
+            remove_by_tag(args.tag, keeper)
 
         elif args.command == 'get':
-            tag = ' '.join(args.tag)
+            tag = args.tag
 
             if args.login:
-                get_login(tag, keeper)
+                get_login(tag, keeper, args.no_clipboard)
 
             elif args.password:
-                get_password(tag, keeper)
-
-            else:
-                get(tag, keeper)
+                get_password(tag, keeper, args.no_clipboard)
 
         elif args.command == 'edit':
-            edit(' '.join(args.tag), keeper)
+            edit(args.tag, keeper)
 
         elif args.command == 'list':
             list_triplets(keeper.triplets, not args.all)
 
         elif args.command == 'search':
-            search(' '.join(args.tag), not args.all, keeper)
-
-        elif args.command == 'dump':
-            dest = args.dir if args.dir else '.'
-            dump(dest, keeper)
-
-        elif args.command == 'change':
-            change_locker(args.dir, keeper)
-
-        elif args.command == 'current':
-            print_locker(keeper)
+            search(args.tag, not args.all, keeper)
 
         elif args.command == 'shred-locker':
             delete_locker(keeper)
 
         elif args.command == 'generate':
-            tag = ' '.join(args.tag)
+            tag = args.tag
             
             generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper)
 
     except KeyboardInterrupt:
-        print('\n\033[32mAboarting...\033[0m')
+        print(green('Aboarting...'))
         return
 
 if __name__ == '__main__':
@@ -443,59 +463,56 @@ if __name__ == '__main__':
     subparsers = p.add_subparsers(dest='command', help='Available commands')
 
     add_parser = subparsers.add_parser('add', help='Add a new triplet with provided tag.')
-    add_parser.add_argument('tag', metavar='TAG', type=str, nargs='+',
+    add_parser.add_argument('tag', metavar='TAG', type=str,
                             help='Tag for the new triplet.')
+    
     add_parser.add_argument('-s', '--show-password', action='store_true',
                             help='Show password when adding triplet')
 
+
     remove_parser = subparsers.add_parser('remove', help='Remove a triplet based on tag.')
-    remove_parser.add_argument('tag', metavar='TAG', type=str, nargs='+',
+    remove_parser.add_argument('tag', metavar='TAG', type=str,
                             help='Tag of the triplet to remove.')
 
-    get_parser = subparsers.add_parser('get', help='Get a triplet based on the tag.')
-    get_parser.add_argument('tag', metavar='TAG', type=str, nargs='+', 
-                             help='Tag of the triplet to get.')
+
+    get_parser = subparsers.add_parser('get', help='Retrieve login or password based on tag.')
+    get_parser.add_argument('tag', metavar='TAG', type=str, help='Tag of the triplet to get.')
+
+    group = get_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('-l', '--login', action='store_true', 
+                       help='Return the login to the clipboard.')
     
-    get_parser.add_argument('-l', '--login', action='store_true', 
-                            help='Return only the login.')
-    
-    get_parser.add_argument('-p', '--password', action='store_true', 
-                            help='Return only the password.')
+    group.add_argument('-p', '--password', action='store_true', 
+                       help='Return the password to the clipboard.')
+
+    get_parser.add_argument('-nc', '--no-clipboard', action='store_true',
+                        help='Use with -l and -p flags. Instead of copying to the clipboard, will print to the terminal.')
+
 
     edit_parser = subparsers.add_parser('edit', help='Interactively edit parameters of a triplet.')
-    edit_parser.add_argument('tag', metavar='TAG', type=str, nargs='+',
+    edit_parser.add_argument('tag', metavar='TAG', type=str,
                             help='Tag of the triplet to edit.')
+
 
     list_parser = subparsers.add_parser('list', help='List all stored triplets.')
     list_parser.add_argument('-a', '--all', action='store_true', 
                              help='Include passwords in the listing.')
 
+
     search_parser = subparsers.add_parser('search', help='Search for a triplets with similar tag.')
-    search_parser.add_argument('tag', metavar='TAG', type=str, nargs='+',
+    search_parser.add_argument('tag', metavar='TAG', type=str,
                                help='Similar tag to search for.')
     
     search_parser.add_argument('-a', '--all', action='store_true',
                                help='Show passwords for every found triplet')
 
-    dump_parser = subparsers.add_parser('dump', help='Copy current .lk file to the provided directory.')
-    dump_parser.add_argument('dir', metavar='[DIR]', type=str, nargs='?',
-                             help='Directory to copy to. If no directory provided, copy to the current directory.')
 
-    change_parser = subparsers.add_parser('change', help='Changes current locker file to provided. Default locker file dir: ~/.local/share/.keeper/default.lk')
-    change_parser.add_argument('dir', metavar='DIR', type=str,
-                               help='Directory to the new locker file.')
+    generate_parser = subparsers.add_parser('generate', help="Generates a password and stores it with provided tag")
 
-    current_parser = subparsers.add_parser('current', help='Prints directory of the current locker in use.')
-
-    shred_parser = subparsers.add_parser('shred-locker', help='Shreds current locker.')
-
-
-    generate_parser = subparsers.add_parser('generate', help="Generates unique password and stores it.")
-
-    generate_parser.add_argument('tag', metavar='TAG', type=str, nargs='+',
+    generate_parser.add_argument('tag', metavar='TAG', type=str,
                                 help='Tag for the new triplet.')
 
-    generate_parser.add_argument('-l', '--length', type=int, default=12,
+    generate_parser.add_argument('-l', '--length', type=int, default=15,
                                  help='Length of the generated password, default value is 12.')
 
     generate_parser.add_argument('-ns', '--no-symbols', action='store_true',
@@ -503,6 +520,21 @@ if __name__ == '__main__':
     
     generate_parser.add_argument('-nl', '--no-letters', action='store_true',
                                  help='generates a password without any letters.')
+
+
+    change_parser = subparsers.add_parser('change', help='Changes current locker file to provided. Default locker file dir: ~/.local/share/.keeper/default.lk')
+    change_parser.add_argument('dir', metavar='DIR', type=str,
+                               help='Directory to the new locker file.')
+
+
+    dump_parser = subparsers.add_parser('dump', help='Copy current .lk file to the provided directory.')
+    dump_parser.add_argument('dir', metavar='[DIR]', type=str, nargs='?',
+                             help='Directory to copy to. If no directory provided, copy to the current directory.')
+
+
+    current_parser = subparsers.add_parser('current', help='Prints directory of the current locker in use.')
+
+    shred_parser = subparsers.add_parser('shred-locker', help='Shreds current locker.')
 
     args = p.parse_args()
 
