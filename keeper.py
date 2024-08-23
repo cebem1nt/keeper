@@ -1,8 +1,227 @@
-from modules.crypt import CryptoSystem, derive_key
-from modules.files import FileSystem
 from argparse import ArgumentParser
-import re, pyperclip
 from getpass import getpass
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from shutil import copy
+
+import re, pyperclip, base64, os, random, string
+
+class FileSystem:
+    """
+    Class for file manipulatoions with password manager file system
+    """
+
+    def __init__(self, dir='~/.local/share/keeper') -> None:
+        self.root_dir = os.path.expanduser(dir)
+        os.makedirs(self.root_dir, exist_ok=True)
+
+        self.current_locker = os.path.join(self.root_dir, '.current_locker') # file with selected locker path
+
+        self.init_locker()
+
+    def init_locker(self) -> None:
+        """
+        Ensure that required directories and files exist.
+        """
+        # making the basic locker if it doesn't exist
+
+        if not os.path.exists(self.current_locker):
+            with open(self.current_locker, 'w'):
+                pass
+
+        self.locker = self.get_current_locker() 
+
+        if not self.locker or not os.path.exists(self.locker):
+            # if its empty, or previous setted locker doesnt exist anymore we set default one and make it 
+            self.locker = os.path.join(self.root_dir, 'default.lk')
+            
+            if not os.path.exists(self.locker):
+                with open(self.locker, 'w') as f:
+                    pass
+
+            self.change_locker(self.locker)
+
+    def salt_exists(self) -> bool:
+        """
+        Check if the salt exists. Used to identify is the first run
+        """
+        try:
+            return bool(self.get_from_locker())
+            
+        except:
+            return False
+
+    def get_from_locker(self, get_salt=True) -> bytes :
+        """
+        Reads content based on param from current locker.
+        """
+        
+        with open(self.locker, 'rb') as f:
+            salt = f.read(16)
+            storage = f.read()
+
+        if get_salt:
+            return salt
+
+        return storage
+
+    def set_to_locker(self, value: bytes, set_salt=True) -> None :
+        """
+        Sets content based on param from current locker. 
+        """
+
+        if set_salt:
+            with open(self.locker, 'wb') as f:
+                f.write(value)
+
+        else:
+            with open(self.locker, 'ab') as f:
+                f.write(value)
+
+    def remove_from_storage(self, index: int) -> None:
+        """
+        Remove a line at specified index from the locker file.
+        """
+
+        storage_lines = self.get_from_locker(False).decode().split('\n')
+
+        if 0 <= index < len(storage_lines):
+            storage_lines.pop(index)
+
+        else:
+            raise IndexError("Index out of range")
+
+        edited_lines = '\n'.join(storage_lines).lstrip('\n').encode()
+        salt = self.get_from_locker()
+
+        with open(self.locker, 'wb') as f:
+            f.write(salt + edited_lines)
+
+    def change_locker(self, dest: str) -> None:
+        """
+        A function to change current locker to provided dir. 
+        locker file is a file with .lk extention
+        """
+        dest = os.path.abspath(os.path.expanduser(dest))
+        
+        if not os.path.exists(dest):
+            raise FileNotFoundError(f"Could not find locker in {dest}")
+
+        with open(self.current_locker, 'w') as f:
+            f.write(dest)
+
+    def copy_locker(self, dir: str) -> None:
+        """
+        Recieves destination dir and copies current locker there
+        """
+        dir = os.path.abspath(os.path.expanduser(dir))
+
+        copy(self.locker, dir)
+
+    def get_current_locker(self):
+        """
+        Returns current locker directory
+        """
+        with open(self.current_locker) as f:
+            return f.read().strip()
+
+    def suicide(self):
+        """
+        Shreds current locker and removes it
+        """
+        try:
+            with open(self.locker, 'r+b') as f:
+                file_size = os.path.getsize(self.locker)
+                
+                for _ in range(2):
+                    f.seek(0)
+                    f.write(bytearray(random.getrandbits(8) for _ in range(file_size)))
+                
+                f.truncate()
+            
+            os.remove(self.locker)
+    
+        except Exception as e:
+            raise e
+
+class CryptoSystem:
+    """
+    Cryptography class for encrypting / decrypting passwords, hashing 
+    and other cryptography manipulations 
+    """
+    def get_cipher(self, key: bytes):
+        """
+        Gets key as bytes and returns Fernet instance for
+        future decryption and encryption
+        """
+        return Fernet(key)
+
+    def encrypt(self, cipher: Fernet, data: str):
+        """
+        Gets data and Fernet instance.
+        returns encrypted data
+        """
+        return cipher.encrypt(data.encode()).decode()
+
+    def decrypt(self, cipher: Fernet, encrypted_data: bytes):
+        """
+        Gets encrypted data and a Fernet instance. 
+        returns decrypted data
+        """
+        return cipher.decrypt(encrypted_data).decode()
+
+    def generate_salt(self):
+        """
+        Generates a random 16-byte salt.
+        """
+        return os.urandom(16)
+    
+    def generate_password(self, length: int, is_no_special_symbols: bool, 
+                          is_no_letters: bool):
+
+        """
+        Based on options, generates random password
+        """
+
+        letters = string.ascii_letters
+        digits = string.digits
+        special_symbols = string.punctuation
+        
+        # Determine the character set to use
+        if is_no_special_symbols and is_no_letters:
+            chars = digits
+        elif is_no_special_symbols:
+            chars = letters + digits
+        elif is_no_letters:
+            chars = digits + special_symbols
+        else:
+            chars = letters + digits + special_symbols
+        
+        if not chars:
+            raise ValueError("Character set is empty. Cannot generate a password.")
+
+        password = ''.join(random.choice(chars) for _ in range(length))
+        
+        return password
+          
+
+        
+def derive_key(passphrase: bytes, salt: bytes):
+    """
+    Gets passphrase and salt, returns a unique key
+    """
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=1000,
+        backend=default_backend()
+    )
+
+    return base64.urlsafe_b64encode(kdf.derive(passphrase))
 
 def red(string: str) -> str:
     return "\033[31m" + string + "\033[0m"
@@ -33,7 +252,7 @@ class Keeper:
             self.triplets = self.get_triplets()
             return True
         
-        except:
+        except :
             return False
 
     def set_cipher(self, passphrase: str):
@@ -81,7 +300,7 @@ class Keeper:
         triplets = []
 
         for line in encrypted_storage_lines:
-            decrypted_line = self.cs.decrypt(self.cipher, line).rstrip('\n')
+            decrypted_line = self.cs.decrypt(self.cipher, line.encode()).rstrip('\n')
             decrypted_line = decrypted_line.replace("/]", "]").replace("/[", "[")
             
             matches = re.findall(pattern, decrypted_line)
@@ -339,9 +558,8 @@ def remove_by_tag(tag: str, keeper: Keeper):
         print(red(f"Could not find triplet with tag: {tag}"))
         return
 
-    print("\033[31m")
     print_triplet(match[0])
-    print("\033[0m") 
+    print('')
 
     remove = input(red("Delete this triplet? [y/N] "))
 
@@ -376,7 +594,7 @@ def edit(tag: str, keeper: Keeper):
         else:
             print("\033[31mIncorrect parameter\033[0m")
 
-    value = input(f'\033[32mEnter new value for "{('tag', 'login', 'password')[param]}": \033[0m')
+    value = input(f'\033[32mEnter new value for \"{("tag", "login", "password")[param]}\": \033[0m')
 
     keeper.edit_triplet_property(triplet, param, value)
     print(green(f'Succesfully edited triplet with tag: "{tag}"'))
