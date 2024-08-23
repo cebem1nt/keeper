@@ -23,9 +23,8 @@ class FileSystem:
 
     def init_locker(self) -> None:
         """
-        Ensure that required directories and files exist.
+        Ensure that required directories and files exist. Initializing locker file
         """
-        # making the basic locker if it doesn't exist
 
         if not os.path.exists(self.current_locker):
             with open(self.current_locker, 'w'):
