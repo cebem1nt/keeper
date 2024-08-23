@@ -21,7 +21,7 @@ gcc -O3 -mtune=native -march=native -I/usr/include/python3.12 -o keeper keeper.c
 
 echo "Compiling finished.."
 
-read -p "Would you like to move the compiled file to /usr/bin? [Y/n] " add_to_usr_bin
+read -p "Would you like to move the compiled file to /usr/bin? (sudo required) [Y/n] " add_to_usr_bin
 
 if [[ "$add_to_usr_bin" != "n" && "$add_to_usr_bin" != "N" ]]; then
     check_sudo

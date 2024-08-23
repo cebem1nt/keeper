@@ -607,12 +607,17 @@ def dump(dest: str, keeper: Keeper):
     except:
         print(f"\033[31mCould not find destination dir: {dest}\033[0m")
     
-def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool, keeper: Keeper):
+def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool, 
+                                keeper: Keeper, do_not_paste=False):
+    
     generated_password = keeper.generate_password(length, syms, letters)
-    print(green("Password is generated. \n"))
+    print(green("Password is generated."))
 
     add_triplet(tag, keeper, password=generated_password)
 
+    if not do_not_paste:
+        pyperclip.copy(generated_password)
+        print(green("Generated password added to the clipboard!"))
 
 def main(args: ArgumentParser):
     keeper = Keeper(FileSystem(), CryptoSystem())
@@ -667,8 +672,8 @@ def main(args: ArgumentParser):
 
         elif args.command == 'generate':
             tag = args.tag
-            
-            generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper)
+
+            generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
 
     except KeyboardInterrupt:
         print(green('Aboarting...'))
@@ -738,6 +743,8 @@ if __name__ == '__main__':
     generate_parser.add_argument('-nl', '--no-letters', action='store_true',
                                  help='generates a password without any letters.')
 
+    generate_parser.add_argument('-np', '--no-paste', action='store_true',
+                                 help='Do not paste generated password to the clipboard')
 
     change_parser = subparsers.add_parser('change', help='Changes current locker file to provided. Default locker file dir: ~/.local/share/.keeper/default.lk')
     change_parser.add_argument('dir', metavar='DIR', type=str,
