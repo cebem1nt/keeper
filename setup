@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Function to check if the script is running with sudo privileges
+check_sudo() {
+    if [ "$(id -u)" -ne "0" ]; then
+        echo "Sudo required. Please run as root."
+        exit 1
+    fi
+}
+
+# Remove old file if it exists
+if [ -f "keeper.c" ]; then
+    rm "keeper.c"
+fi
+
+echo "Compiling..."
+
+# Compile the Python script with Cython
+cython3 -3 --embed -o keeper.c keeper.py
+gcc -O3 -mtune=native -march=native -I/usr/include/python3.12 -o keeper keeper.c -lpython3.12 -lpthread
+
+echo "Compiling finished.."
+
+read -p "Would you like to move the compiled file to /usr/bin? [Y/n] " add_to_usr_bin
+
+if [[ "$add_to_usr_bin" != "n" && "$add_to_usr_bin" != "N" ]]; then
+    check_sudo
+    echo "Moving to /usr/bin ..."
+    mv keeper /usr/bin/
+    echo "File moved to /usr/bin."
+    echo "Finished."
+else
+    echo "Finished."
+fi
