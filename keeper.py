@@ -117,7 +117,7 @@ class FileSystem:
                     current_index += 1
 
         except KeyboardInterrupt:
-            os.remove(temp_file)
+            return os.remove(temp_file)
 
         os.replace(temp_file, self.locker)
 
@@ -358,6 +358,7 @@ class Keeper:
 
         encrypted_line = self.cs.encrypt(self.cipher, formatted_line) + '\n'
         self.fs.set_to_locker(encrypted_line.encode(), set_salt=False)
+        self.triplets = self.get_triplets()
 
     def get_triplets_by_tag(self, tag: str, strict=True):
         """
@@ -384,6 +385,7 @@ class Keeper:
         triplet_index = self.triplets.index(triplet)
 
         self.fs.remove_from_storage(triplet_index)
+        self.triplets = self.get_triplets()
 
     def reset(self):
         """
@@ -401,6 +403,10 @@ class Keeper:
         edited_triplet = list(triplet)
         edited_triplet[property] = value
         t, l, p = edited_triplet
+
+        if len(self.get_triplets_by_tag(t)):
+            raise ValueError("Triplet already exist")
+
         self.remove_triplet(triplet)
         self.store_triplet(t, l, p)
 
@@ -436,7 +442,7 @@ def auth(keeper: Keeper) -> str:
 
     current_locker = f"[{keeper.get_current_locker(True)}] "
 
-    if current_locker == '[keeper/default.lk] ' or current_locker == '[keeper\default.lk] ':
+    if current_locker == '[keeper/default.lk] ' or current_locker == '[keeper\\default.lk] ':
         current_locker = ''
 
     current_locker = blue(current_locker)
@@ -525,12 +531,11 @@ def change_locker(new_locker: str, keeper: Keeper):
 
 
 def add_triplet(tag: str, keeper: Keeper, do_show=False, password=''):
-    print("\n\033[36mCreating new triplet...\n")
-
     if len(keeper.get_triplets_by_tag(tag)):
         print(red(f"Triplet with tag '{tag}' already exists.\n"))
         return
 
+    print(blue(f'Creating new triplet with tag "{tag}"'))
     while True:
         login = input("\033[36mEnter the login: ")
 
@@ -595,7 +600,7 @@ def search(tag: str, do_show: bool, keeper: Keeper):
     matches = keeper.get_triplets_by_tag(tag, False)
     list_triplets(matches, do_show)
 
-def remove_by_tag(tag: str, keeper: Keeper):
+def remove_by_tag(tag: str, keeper: Keeper, no_confirm=False):
     match = keeper.get_triplets_by_tag(tag)
 
     if not len(match):
@@ -605,14 +610,16 @@ def remove_by_tag(tag: str, keeper: Keeper):
     print_triplet(match[0])
     print('')
 
-    remove = input(red("Delete this triplet? [y/N] "))
+    if not no_confirm:
+        remove = input(red("Delete this triplet? [y/N] "))
 
-    if 'y' == remove.lower():
-        keeper.remove_triplet(match[0])
-        print(green("Triplet deleted"))
+        if 'y' != remove.lower():
+            print(green("Aboarting.."))
+            return
 
-    else:
-        print(green("Aboarting.."))
+    keeper.remove_triplet(match[0])
+    print(green("Triplet deleted"))
+
 
 def edit(tag: str, keeper: Keeper):
     triplets = keeper.get_triplets_by_tag(tag)
@@ -622,12 +629,13 @@ def edit(tag: str, keeper: Keeper):
         return
 
     triplet = triplets[0]
+    print(green(f'\nEditing triplet with tag "{tag}"'))
 
-    print("\033[32mParameters that can be edited: \n 0 - tag \n 1 - login \n 2 - password\033[0m")
+    print(blue("\nParameters that can be edited: \n\t0 - tag \n\t1 - login \n\t2 - password\n"))
 
     while True:
         try:
-            param = int(input("\033[32mEnter the parameter to edit (0-2): \033[0m"))
+            param = int(input(green("Enter the parameter to edit (0-2): ")))
 
         except:
             param = -1
@@ -638,9 +646,16 @@ def edit(tag: str, keeper: Keeper):
         else:
             print(red("Incorrect parameter"))
 
-    value = input(f'\033[32mEnter new value for \"{("tag", "login", "password")[param]}\": \033[0m')
+    while True:
+        value = input(f'\033[32mEnter new value for \"{("tag", "login", "password")[param]}\": \033[0m')
 
-    keeper.edit_triplet_property(triplet, param, value)
+        try:
+            keeper.edit_triplet_property(triplet, param, value)
+            break
+
+        except ValueError:
+            print(red(f'Triplet with tag "{value}" already exist'))
+
     print(green(f'Succesfully edited triplet with tag: "{tag}"'))
 
 def dump(dest: str, keeper: Keeper):
@@ -689,10 +704,12 @@ def main(args: ArgumentParser):
             auth(keeper)
 
         if args.command == 'add':
-            add_triplet(args.tag, keeper, args.show_password)
+            for t in args.tag:
+                add_triplet(t, keeper, args.show_password)
 
         elif args.command == 'remove':
-            remove_by_tag(args.tag, keeper)
+            for t in args.tag:
+                remove_by_tag(t, keeper, args.no_ask)
 
         elif args.command == 'get':
             tag = args.tag
@@ -704,7 +721,8 @@ def main(args: ArgumentParser):
                 get_password(tag, keeper, args.no_clipboard)
 
         elif args.command == 'edit':
-            edit(args.tag, keeper)
+            for t in args.tag:
+                edit(t, keeper)
 
         elif args.command == 'list':
             list_triplets(keeper.triplets, not args.all)
@@ -729,18 +747,20 @@ if __name__ == '__main__':
 
     subparsers = p.add_subparsers(dest='command', help='Available commands')
 
-    add_parser = subparsers.add_parser('add', help='Add a new triplet with provided tag.')
-    add_parser.add_argument('tag', metavar='TAG', type=str,
-                            help='Tag for the new triplet.')
+    add_parser = subparsers.add_parser('add', help='Add a new triplet with provided tag or tags.')
+    add_parser.add_argument('tag', metavar='TAG(S)', type=str, nargs='+',
+                            help='Tag(s) for the new triplet(s).')
     
     add_parser.add_argument('-s', '--show-password', action='store_true',
                             help='Show password when adding triplet')
 
 
-    remove_parser = subparsers.add_parser('remove', help='Remove a triplet based on tag.')
-    remove_parser.add_argument('tag', metavar='TAG', type=str,
-                            help='Tag of the triplet to remove.')
+    remove_parser = subparsers.add_parser('remove', help='Remove a triplet based on tag or tags.')
+    remove_parser.add_argument('tag', metavar='TAG(S)', type=str, nargs='+',
+                            help='Tag(s) of the triplet(s) to remove.')
 
+    remove_parser.add_argument('-na', '--no-ask', action='store_true',
+                               help='Do not confrm deleting of a triplet')
 
     get_parser = subparsers.add_parser('get', help='Retrieve login or password based on tag.')
     get_parser.add_argument('tag', metavar='TAG', type=str, help='Tag of the triplet to get.')
@@ -753,12 +773,12 @@ if __name__ == '__main__':
                        help='Return the password to the clipboard.')
 
     get_parser.add_argument('-nc', '--no-clipboard', action='store_true',
-                        help='Use with -l and -p flags. Instead of copying to the clipboard, will print to the terminal.')
+                        help='Instead of copying to the clipboard, will print to the terminal.')
 
 
     edit_parser = subparsers.add_parser('edit', help='Interactively edit parameters of a triplet.')
-    edit_parser.add_argument('tag', metavar='TAG', type=str,
-                            help='Tag of the triplet to edit.')
+    edit_parser.add_argument('tag', metavar='TAG(S)', type=str, nargs='+',
+                            help='Tag(s) of the triplet(s) to edit.')
 
 
     list_parser = subparsers.add_parser('list', help='List all stored triplets.')
