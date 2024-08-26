@@ -7,6 +7,7 @@ from cryptography.hazmat.backends import default_backend
 from shutil import copy
 from platform import system
 from hashlib import sha256
+from sys import exit as sys_exit
 
 import re, pyperclip, base64, os, random, string
 
@@ -21,7 +22,7 @@ class FileSystem:
         # file with current selected locker directory
 
         self._salt_size=salt_size
-        self._header_size=header_size
+        self._header_size=header_size # size as symbols
 
         self.init_locker()
 
@@ -43,7 +44,7 @@ class FileSystem:
             return dir
         
         else:
-            raise OSError("Unsuported os.")
+            raise OSError(f"Unsuported os: {platform}")
 
     def init_locker(self) -> None:
         """
@@ -113,8 +114,11 @@ class FileSystem:
 
     def set_to_locker(self, value: bytes, set_salt=True) -> None :
         """
-        Sets content based on param from current locker. 
+        Sets/Appends content to the locker based on param. 
         """
+
+        if not set_salt and not self.salt_exists():
+            raise Warning("Salt doesn't exist!")
 
         mode = 'wb' if set_salt else 'ab'
 
@@ -147,16 +151,23 @@ class FileSystem:
     def change_locker(self, dest: str) -> None:
         """
         A function to change current locker to provided dir. 
-        locker file is a file with .lk extention
         """
 
         dest = os.path.abspath(os.path.expanduser(dest))
         
-        if not os.path.exists(dest):
-            raise FileNotFoundError(f"Could not find locker in {dest}")
+        if os.path.isdir(dest):
+            raise ValueError("Argument is a directory")
+
+        elif not os.path.exists(dest):
+            raise FileNotFoundError("Could not find locker file")
+
+        elif dest == self.get_current_locker():
+            raise IndentationError("Same file")
 
         with open(self.current_locker_file, 'w') as f:
             f.write(dest)
+
+        self.init_locker() # Reset locker file to the new locker
 
     def copy_locker(self, dir: str) -> None:
         """
@@ -218,7 +229,6 @@ def derive_key(passphrase: bytes, salt: bytes):
 class CryptoSystem:
     """
     Cryptography class for encrypting / decrypting passwords, hashing 
-    and other cryptography manipulations 
     """
 
     def get_cipher(self, key: bytes):
@@ -254,8 +264,7 @@ class CryptoSystem:
         """
         return sha256(content.encode()).hexdigest().encode()
 
-    def generate_password(self, length: int, is_no_special_symbols: bool, 
-                          is_no_letters: bool):
+    def generate_password(self, length: int, is_no_special_symbols: bool, is_no_letters: bool):
 
         """
         Based on options, generates random password
@@ -423,13 +432,13 @@ class Keeper:
         """
         triplet = list(self.get_triplet(tag))
         triplet[property] = value
-        t, l, p = triplet
+        new_tag, new_login, new_password = triplet
 
-        if t == tag:
+        if property == 0 and self.get_triplet(new_tag):
             raise ValueError("Triplet already exist")
 
         self.remove_triplet(tag)
-        self.store_triplet(t, l, p)
+        self.store_triplet(new_tag, new_login, new_password)
 
     def copy_locker(self, destination: str):
         """
@@ -489,7 +498,6 @@ class Keeper:
             
             else:
                 print(red("Incorrect passphrase, try again"))
-        
 
     def console_registrate(self):
         """
@@ -528,6 +536,10 @@ class Keeper:
                 print(green("Passphrase created"))
                 self.init_keeper(passphrase)
                 return
+            
+            else:
+                print(red("Passwords don't match"))
+
 
 def print_locker(locker: str):
     print(f"\n\033[32mCurrent locker: \033[36m{locker}\n\033[0m")
@@ -560,14 +572,19 @@ def change_locker(new_locker: str, keeper: Keeper):
         keeper.change_locker(new_locker)
         print(green(f'\nSuccesfuly changed current locker to : {new_locker}\n'))
 
-    except:
-        print(red(f"\nCould not find locker dir: {new_locker}\n"))
+    except FileNotFoundError:
+        print(red(f"\nCould not find: {new_locker}\n"))
 
+    except ValueError:
+        print(red(f"\n{new_locker} should be a .lk file\n"))
+
+    except IndentationError:
+        print(red(f"\n{new_locker} is current locker\n"))
 
 def add_triplet(tag: str, keeper: Keeper, do_show_password=False, password=None):
     if keeper.get_triplet(tag):
         print(red(f"Triplet with tag '{tag}' already exists.\n"))
-        return
+        return 2
 
     print(blue(f'\nCreating new triplet with tag "{tag}"\n'))
 
@@ -700,35 +717,22 @@ def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool
     generated_password = keeper.generate_password(length, syms, letters)
     print(green("Password is generated."))
 
-    add_triplet(tag, keeper, password=generated_password)
-
-    if not do_not_paste:
+    if not do_not_paste and add_triplet(tag, keeper, password=generated_password) != 2:
         pyperclip.copy(generated_password)
         print(green("Generated password added to the clipboard!"))
 
-def main(args: ArgumentParser):
-    keeper = Keeper(FileSystem(), CryptoSystem())
-    
+def main(args: ArgumentParser, keeper: Keeper):    
     try:
 
         if args.command == 'change':
             change_locker(args.dir, keeper)
-            return 
         
         elif args.command == 'current':
             print_locker(keeper.get_current_locker())
-            return
         
         elif args.command == 'dump':
             dest = args.dir if args.dir else '.'
             dump(dest, keeper)
-            return
-
-        if not keeper.passphrase_exist():
-            keeper.console_registrate()
-
-        else:
-            keeper.console_auth()
 
         if args.command == 'add':
             for t in args.tag:
@@ -752,10 +756,14 @@ def main(args: ArgumentParser):
                 edit(t, keeper)
 
         elif args.command == 'list':
+            items = keeper.list_triplets()
+
             if args.num:
-                print(len(keeper.list_triplets()))
+                print(len(items))
             else:
-                print_triplets(keeper.list_triplets(), not args.all)
+                print_triplets(items, not args.all)
+
+            del items
 
         elif args.command == 'search':
             search(args.tag, not args.all, keeper)
@@ -769,8 +777,7 @@ def main(args: ArgumentParser):
             generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
 
     except KeyboardInterrupt:
-        print(green('\nAboarting...'))
-        return
+        return print(green('\nAborting...'))
 
 if __name__ == '__main__':
     p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
@@ -831,8 +838,8 @@ if __name__ == '__main__':
     generate_parser.add_argument('tag', metavar='TAG', type=str,
                                 help='Tag for the new triplet.')
 
-    generate_parser.add_argument('-l', '--length', type=int, default=15,
-                                 help='Length of the generated password, default value is 12.')
+    generate_parser.add_argument('-l', '--length', type=int, default=16,
+                                 help='Length of the generated password, default value is 16.')
 
     generate_parser.add_argument('-ns', '--no-symbols', action='store_true',
                                  help='generates a password without any special symbols.')
@@ -859,8 +866,69 @@ if __name__ == '__main__':
 
     args = p.parse_args()
 
-    if any(vars(args).values()):
-        main(args)
+    keeper = Keeper(FileSystem(), CryptoSystem())
 
-    else:
-       p.print_help()
+
+    try:
+        if args.command == 'change':
+            change_locker(args.dir, keeper)
+            sys_exit(0)
+        
+        elif args.command == 'current':
+            print_locker(keeper.get_current_locker())
+            sys_exit(0)
+
+        # A weird part of handling, just not to stuck if you forgot password and want to change locker
+
+        if not keeper.passphrase_exist():
+            keeper.console_registrate()
+
+        else:
+            keeper.console_auth()
+
+    except KeyboardInterrupt:
+        sys_exit(1)
+
+    if any(vars(args).values()):
+        main(args, keeper)
+
+    else: # Entering loop
+        current_locker = keeper.get_current_locker()
+        while True:
+            try:
+                if not keeper.passphrase_exist():
+                    keeper.console_registrate()
+
+                elif current_locker != keeper.get_current_locker():
+                    # In case locker was changed
+                    keeper.console_auth()
+                    current_locker = keeper.get_current_locker()
+
+                command = input(">> ").strip()
+
+                if command.lower() in ("quit", "exit"):
+                    print(green("Exiting..."))
+                    break
+                
+                elif command.lower() == 'help':
+                    p.print_help()
+                    continue
+
+                elif command.lower() == 'clear':
+                    os.system('clear')
+                    continue
+
+                args = p.parse_args(command.split())
+
+                if any(vars(args).values()):
+                    main(args, keeper)
+
+                else:
+                    continue
+
+            except KeyboardInterrupt:
+                print(green("\nExiting..."))
+                break
+
+            except SystemExit:
+                continue
