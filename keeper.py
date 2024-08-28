@@ -8,8 +8,19 @@ from shutil import copy
 from platform import system
 from hashlib import sha256
 from sys import exit as sys_exit
+from subprocess import run as sub_run
 
-import re, pyperclip, base64, os, random, string
+import re, base64, pyperclip, os, random, string
+
+def add_to_clipboard(content: str):
+    try:
+        pyperclip.copy(content)
+
+    except Exception as e:
+        if 'TERMUX_VERSION' in os.environ:
+            sub_run(["termux-clipboard-set", content])
+        else:
+            raise e
 
 class FileSystem:
     """
@@ -626,7 +637,7 @@ def get_password(tag: str, keeper: Keeper, no_clipboard=False):
 
     else:
         print(green("Password added to the clipboard!"))
-        pyperclip.copy(triplet[2])
+        add_to_clipboard(triplet[2])
 
 def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
     triplet = keeper.get_triplet(tag)
@@ -640,7 +651,7 @@ def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
 
     else:
         print(green("Login added to the clipboard!"))
-        pyperclip.copy(triplet[1])
+        add_to_clipboard(triplet[1])
 
 def search(tag: str, do_show: bool, keeper: Keeper):
     found = keeper.search_for_triplet(tag)
@@ -718,7 +729,7 @@ def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool
     print(green("Password is generated."))
 
     if not do_not_paste and add_triplet(tag, keeper, password=generated_password) != 2:
-        pyperclip.copy(generated_password)
+        add_to_clipboard(generated_password)
         print(green("Generated password added to the clipboard!"))
 
 def main(args: ArgumentParser, keeper: Keeper):    
