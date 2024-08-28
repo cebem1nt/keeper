@@ -636,8 +636,9 @@ def get_password(tag: str, keeper: Keeper, no_clipboard=False):
         print(triplet[2])
 
     else:
-        print(green("Password added to the clipboard!"))
         add_to_clipboard(triplet[2])
+        print(green("Password added to the clipboard!"))
+
 
 def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
     triplet = keeper.get_triplet(tag)
@@ -650,8 +651,8 @@ def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
         print(triplet[1])
 
     else:
-        print(green("Login added to the clipboard!"))
         add_to_clipboard(triplet[1])
+        print(green("Login added to the clipboard!"))
 
 def search(tag: str, do_show: bool, keeper: Keeper):
     found = keeper.search_for_triplet(tag)
