@@ -32,3 +32,5 @@ if [[ "$add_to_usr_bin" != "n" && "$add_to_usr_bin" != "N" ]]; then
 else
     echo "Finished."
 fi
+
+rm keeper.c

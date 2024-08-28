@@ -9,7 +9,7 @@ from platform import system
 from hashlib import sha256
 from sys import exit as sys_exit
 
-import re, pyperclip, base64, os, random, string
+import re, pyclip, base64, os, random, string
 
 class FileSystem:
     """
@@ -626,7 +626,7 @@ def get_password(tag: str, keeper: Keeper, no_clipboard=False):
 
     else:
         print(green("Password added to the clipboard!"))
-        pyperclip.copy(triplet[2])
+        pyclip.copy(triplet[2])
 
 def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
     triplet = keeper.get_triplet(tag)
@@ -640,7 +640,7 @@ def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
 
     else:
         print(green("Login added to the clipboard!"))
-        pyperclip.copy(triplet[1])
+        pyclip.copy(triplet[1])
 
 def search(tag: str, do_show: bool, keeper: Keeper):
     found = keeper.search_for_triplet(tag)
@@ -718,7 +718,7 @@ def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool
     print(green("Password is generated."))
 
     if not do_not_paste and add_triplet(tag, keeper, password=generated_password) != 2:
-        pyperclip.copy(generated_password)
+        pyclip.copy(generated_password)
         print(green("Generated password added to the clipboard!"))
 
 def main(args: ArgumentParser, keeper: Keeper):    
