@@ -27,12 +27,14 @@ class FileSystem:
     Class for file manipulatoions with password manager file system
     """
 
-    def __init__(self, salt_size=16, header_size=64) -> None:
+    def __init__(self, key_size=32, header_size=64) -> None:
         self.root_dir = self._determine_root_dir()
+        self.key = os.path.join(self.root_dir, 'key') 
+        # Now salt will be stored independently from the locker. And will be used as unique key
         self.current_locker_file = os.path.join(self.root_dir, '.current_locker') 
         # file with current selected locker directory
 
-        self._salt_size=salt_size
+        self._key_size=key_size 
         self._header_size=header_size # size as symbols
 
         self.init_locker()
@@ -78,22 +80,22 @@ class FileSystem:
 
             self.change_locker(self.locker)
 
-    def salt_exists(self) -> bool:
+    def key_exists(self) -> bool:
         """
         Check if the salt exists.
         """
         try:
-            return bool(self.get_salt())
+            return bool(self.get_key())
             
         except:
             return False
 
-    def get_salt(self) -> bytes:
+    def get_key(self) -> bytes:
         """
-        Returns salt of the file
+        Returns salt
         """
-        with open(self.locker, 'rb') as f:
-            return f.read(self._salt_size)
+        with open(self.key, 'rb') as f:
+            return f.read()
         
     def get_line_from_storage(self, header: bytes) -> bytes| None:
         """
@@ -101,8 +103,6 @@ class FileSystem:
         """
 
         with open(self.locker, 'rb') as locker:
-            locker.read(self._salt_size)
-
             for line in locker:
                 line_header = line[:self._header_size]
 
@@ -116,24 +116,23 @@ class FileSystem:
         lines = []
 
         with open(self.locker, 'rb') as locker:
-            locker.read(self._salt_size)
-
             for line in locker:
                 lines.append(line[self._header_size:])
         
         return lines
 
-    def set_to_locker(self, value: bytes, set_salt=True) -> None :
+    def set_key(self, key: bytes):
+        """
+        Sets key
+        """
+        with open(self.key, 'wb') as f:
+            f.write(key)
+
+    def set_to_locker(self, value: bytes) -> None :
         """
         Sets/Appends content to the locker based on param. 
         """
-
-        if not set_salt and not self.salt_exists():
-            raise Warning("Salt doesn't exist!")
-
-        mode = 'wb' if set_salt else 'ab'
-
-        with open(self.locker, mode) as f:
+        with open(self.locker, 'ab') as f:
             f.write(value)
 
     def remove_from_storage(self, header: bytes) -> None:
@@ -145,7 +144,6 @@ class FileSystem:
 
         try:
             with open(self.locker, 'rb') as original, open(temp_file, 'wb') as tmp:
-                tmp.write(original.read(self._salt_size))
 
                 for line in original:
                     line_header = line[:self._header_size]
@@ -263,7 +261,7 @@ class CryptoSystem:
         """
         return cipher.decrypt(encrypted_data).decode()
 
-    def generate_salt(self, size=16):
+    def generate_salt(self, size=32):
         """
         Generates a random salt of given size.
         """
@@ -348,12 +346,12 @@ class Keeper:
         """
         passphrase_bytes = passphrase.encode()
 
-        if not self.fs.salt_exists():
+        if not self.fs.key_exists():
             salt = self.cs.generate_salt()
-            self.fs.set_to_locker(salt)
+            self.fs.set_key(salt)
 
         else:
-            salt = self.fs.get_salt()
+            salt = self.fs.get_key()
 
         key = derive_key(passphrase_bytes, salt)
         self.cipher = self.cs.get_cipher(key)
@@ -423,7 +421,7 @@ class Keeper:
         hash_tag = self.cs.hash(tag)
 
         encrypted_line = self.cs.encrypt(self.cipher, formatted_line) + '\n'
-        self.fs.set_to_locker(hash_tag + encrypted_line.encode(), set_salt=False)
+        self.fs.set_to_locker(hash_tag + encrypted_line.encode())
 
     
     def remove_triplet(self, tag: str):
@@ -485,7 +483,7 @@ class Keeper:
         """
         Checks is passphrase already exists
         """
-        return self.fs.salt_exists()
+        return self.fs.key_exists()
 
     # Interface functions
 
