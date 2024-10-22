@@ -1,4 +1,4 @@
-import re, base64, pyperclip, random, string, os, stat, subprocess
+import re, pyperclip, random, string, os
 
 from argparse import ArgumentParser
 from getpass import getpass
@@ -11,11 +11,15 @@ from hashlib import sha256
 from sys import exit as sys_exit
 from shutil import copy as sh_copy
 from platform import system as pl_system
+from subprocess import run as sub_run
+from base64 import urlsafe_b64encode as b64_encode
+
+from stat import S_IRUSR, S_IWUSR
 
 # This is a project code for a minimalistic and at the same time 
-# very functional python password manager. The following project 
+# functional python password manager. The following project 
 # is located at one file to make compilation to the .c code easy.
-# For sequrity reasons, the following code should be compiled.
+# For sequrity reasons, the following python code should be compiled.
 
 # This password manager built as a layered project, from the bottom where
 # files are getting manipulated, the medium where class provides some kind of API,
@@ -25,31 +29,13 @@ from platform import system as pl_system
 
 ## Lib functions
 
-def own(file: str):
-    os.chmod(file, stat.S_IRUSR | stat.S_IWUSR)
-
-def escape_brackets(text: str):
-    return text.replace("]", "/]").replace("[", "/[")
-
-def restore_brackets(text: str):
-    return text.replace("/]", "]").replace("/[", "[")
-
-def red(string: str):
-    return "\033[31m" + string + "\033[0m"
-
-def green(string: str):
-    return "\033[32m" + string + "\033[0m"
-
-def blue(string: str):
-    return "\033[34m" + string + "\033[0m"
-
 def add_to_clipboard(content: str):
     try:
         pyperclip.copy(content)
 
     except Exception as e:
         if 'TERMUX_VERSION' in os.environ:
-            subprocess.run(["termux-clipboard-set", content])
+            sub_run(["termux-clipboard-set", content])
         else:
             raise e
 
@@ -61,8 +47,7 @@ def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
         iterations=itr,
         backend=default_backend()
     )
-
-    return base64.urlsafe_b64encode(kdf.derive(passphrase))
+    return b64_encode(kdf.derive(passphrase))
 
 ## Base classes and functionality
 
@@ -75,7 +60,6 @@ class SaltManager:
         try:
             with open(self.dir, 'rb') as f:
                 return bool(f.read(self._size)) 
-
         except:
             return False
     
@@ -86,7 +70,7 @@ class SaltManager:
             with open(self.dir, 'wb') as f:
                 f.write(salt)
 
-            own(self.dir)
+            os.chmod(self.dir, S_IRUSR | S_IWUSR)
             return salt
 
         else:
@@ -95,31 +79,26 @@ class SaltManager:
 
 class CrossPlatform:
     def __init__(self):
-        self.__init_dirs()
+        self.platform = pl_system()
+        storage_dir = os.getenv("KEEPER_STORAGE_DIR")
 
-    def __init_dirs(self):
-        platform = pl_system()
-
-        def win(dir):
-            return lambda : os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), dir)
-        
-        def linux(dir):
-            return lambda : os.path.expanduser(dir)
+        if storage_dir is None or not os.path.exists(storage_dir):
+            storage_dir = os.path.expanduser('~/.keeper_storage')
 
         dirs = {
-            'Linux'  : ( linux('~/.local/share/keeper'), linux('~/.keeper_storage')),    
-            'Darwin' : ( linux('~/.local/share/keeper'), linux('~/.keeper_storage')),
-            'Windows': ( win('keeper'), win('keeper_storage')),
+            'Windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'keeper'),
+            'Linux'  : os.path.expanduser('~/.local/share/keeper'), 
+            'Darwin' : os.path.expanduser('~/.local/share/keeper'),
         }
 
-        if platform in dirs:
-            self.root_dir = dirs[platform][0]()
-            self.storage_dir = dirs[platform][1]()
+        if self.platform in dirs:
+            self.root_dir = dirs[self.platform]
+            self.storage_dir = storage_dir
             os.makedirs(self.root_dir, exist_ok=True)
             os.makedirs(self.storage_dir, exist_ok=True)
 
         else:
-            raise OSError(f"Unsuported os: {platform}")
+            raise OSError(f"Unsuported os: {self.platform}")
 
 class FileSystem(CrossPlatform):
     """
@@ -146,46 +125,46 @@ class FileSystem(CrossPlatform):
 
     def __sync_locker(self):
         current_locker =  self.get_current_locker()
-        self.locker = os.path.join(self.storage_dir, current_locker)
+        self.locker_file = os.path.join(self.storage_dir, current_locker)
 
-        if not current_locker or not os.path.exists(self.locker):
-            self.locker = os.path.join(self.storage_dir, 'default.lk')
+        if not current_locker or not os.path.exists(self.locker_file):
+            self.locker_file = os.path.join(self.storage_dir, 'default.lk')
 
-            if not os.path.exists(self.locker):
-                open(self.locker, 'w').close()
+            if not os.path.exists(self.locker_file):
+                open(self.locker_file, 'w').close()
 
             self.change_locker('default.lk', same_ok=True)
 
     def open_tmp_locker(self, tmp_locker: str):
         if os.path.exists(tmp_locker):
-            self.locker = tmp_locker
+            self.locker_file = tmp_locker
         else:
-            raise FileExistsError("Tmp locker doesn't exist")
+            raise FileNotFoundError("Tmp locker doesn't exist")
 
-    def get_line_from_storage(self, header: bytes) -> bytes | None:
-        with open(self.locker, 'rb') as locker:
+    def _get_line_from_storage(self, header: bytes) -> bytes | None:
+        with open(self.locker_file, 'rb') as locker:
             locker.read(self._salt_size)
             for line in locker:
                 line_header = line[:self._header_size]
                 if line_header == header:
                     return line[self._header_size:]
 
-    def get_all_lines_from_storage(self) -> list[bytes]:
+    def _get_all_lines_from_storage(self) -> list[bytes]:
         lines = []
-        with open(self.locker, 'rb') as locker:
+        with open(self.locker_file, 'rb') as locker:
             locker.read(self._salt_size)
             for line in locker:
                 lines.append(line[self._header_size:])
         return lines
 
-    def append_line_to_storage(self, header: bytes, line: bytes):
-        with open(self.locker, 'ab') as f:
+    def _append_line_to_storage(self, header: bytes, line: bytes):
+        with open(self.locker_file, 'ab') as f:
             f.write(header+line)
 
-    def remove_line_from_storage(self, header: bytes):
-        temp_file = self.locker + '.tmp'
+    def _remove_line_from_storage(self, header: bytes):
+        temp_file = self.locker_file + '.tmp'
         try:
-            with open(self.locker, 'rb') as original, open(temp_file, 'wb') as tmp:
+            with open(self.locker_file, 'rb') as original, open(temp_file, 'wb') as tmp:
                 tmp.write(original.read(self._salt_size))
                 for line in original:
                     if header != line[:self._header_size]:
@@ -195,11 +174,12 @@ class FileSystem(CrossPlatform):
             raise e
         except KeyboardInterrupt:
             return os.remove(temp_file)
-        os.replace(temp_file, self.locker)
+        os.replace(temp_file, self.locker_file)
 
-    def get_current_locker(self):
-        with open(self.current_locker_file) as f:
-            return f.read().strip()
+    def get_current_locker(self, is_full=False):
+        with open(self.current_locker_file) as f:                
+            cl = f.read().strip()
+            return os.path.join(self.storage_dir, cl) if is_full else cl
 
     def change_locker(self, dest: str, same_ok=False) -> None:
         if os.path.isdir(dest):
@@ -210,7 +190,7 @@ class FileSystem(CrossPlatform):
         if not os.path.exists(tmpdest):
             default_locker = os.path.join(self.storage_dir, 'default.lk')
             if tmpdest == default_locker:
-                open(self.locker, 'w').close()
+                open(self.locker_file, 'w').close()
             else:
                 raise FileNotFoundError("Could not find locker file")
         
@@ -223,31 +203,31 @@ class FileSystem(CrossPlatform):
         self.__sync_locker() # Sync locker file to the new locker
 
     def copy_locker(self, dir: str):
-        sh_copy(self.locker, os.path.abspath(os.path.expanduser(dir)))
+        sh_copy(self.locker_file, os.path.abspath(os.path.expanduser(dir)))
 
     def copy_token(self, dir: str):
         sh_copy(self.token_file, os.path.abspath(os.path.expanduser(dir)))
 
-    def suicide(self, passes=3):
+    def reset(self, passes=3):
         try:
-            file_size = os.path.getsize(self.locker)
-            with open(self.locker, 'r+b') as f:
+            file_size = os.path.getsize(self.locker_file)
+            with open(self.locker_file, 'r+b') as f:
                 for _ in range(passes):
                     f.seek(0)
                     f.write(bytearray(random.getrandbits(8) for _ in range(file_size)))
                     f.flush()
-            os.remove(self.locker)
+            os.remove(self.locker_file)
             self.change_locker('default.lk', same_ok=True)
         except Exception as e:
             raise e
 
-class Keeper:
+class Keeper(FileSystem):
     """
     Class for high level manipulations for a keeper password manager.
     """
 
     def __init__(self, token_size=32, salt_size=16, iterations=340000):
-        self.fs = FileSystem(salt_size=salt_size)
+        super().__init__(salt_size=salt_size)
         self._cipher = None
         self._salt_size = salt_size
         self._token_size = token_size
@@ -263,6 +243,8 @@ class Keeper:
         return sha256(content.encode()).hexdigest().encode()
 
     def _decrypt_triplet(self, line: bytes):
+        restore_brackets = lambda text: text.replace("/]", "]").replace("/[", "[")
+
         decrypted_line = restore_brackets(self.__decrypt(line).rstrip('\n'))
         matches: list[str] = re.findall(r'\[\s*([^\]]+?)\s*\]', decrypted_line)
         
@@ -274,8 +256,8 @@ class Keeper:
 
     def _set_cipher(self, passphrase: str):
         passphrase_bytes = passphrase.encode()
-        locker_salt = SaltManager(self._salt_size, self.fs.locker).get()
-        token = SaltManager(self._token_size, self.fs.token_file).get()
+        locker_salt = SaltManager(self._salt_size, self.locker_file).get()
+        token = SaltManager(self._token_size, self.token_file).get()
 
         self.cipher = self._cipher = Fernet(derive_key(passphrase_bytes, locker_salt, token, self._iterations))
 
@@ -299,7 +281,7 @@ class Keeper:
 
     def list_triplets(self):
         """Returns a list of stored triplets"""
-        encrypted_lines = self.fs.get_all_lines_from_storage()
+        encrypted_lines = self._get_all_lines_from_storage()
         decrypted_triplets = []
 
         for line in encrypted_lines:
@@ -309,7 +291,7 @@ class Keeper:
 
     def search_for_triplet(self, part_tag: str):
         """Searches for a triplet with the provided part of the tag"""
-        encrypted_lines = self.fs.get_all_lines_from_storage()
+        encrypted_lines = self._get_all_lines_from_storage()
         found = []
 
         for line in encrypted_lines:
@@ -324,7 +306,7 @@ class Keeper:
         """Returns a triplet with the same tag"""
         hash_tag = self.__hash(tag)
 
-        found = self.fs.get_line_from_storage(hash_tag)
+        found = self._get_line_from_storage(hash_tag)
 
         if found:
             return self._decrypt_triplet(found)
@@ -334,13 +316,15 @@ class Keeper:
     def store_triplet(self, tag: str, login: str, password: str):
         """ Stores a formatted triplet (nametag, login, password) in the storage after encryption."""
 
-        tag = escape_brackets(tag).strip()
-        login = escape_brackets(login).strip()
-        password = escape_brackets(password).strip()
+        escape_brackets = lambda text: text.replace("]", "/]").replace("[", "/[").strip()
+            
+        tag = escape_brackets(tag)
+        login = escape_brackets(login)
+        password = escape_brackets(password)
 
         formatted_line = f"[ {tag} ] [ {login} ] [ {password} ]"
         encrypted_line = self.__encrypt(formatted_line) + '\n'
-        self.fs.append_line_to_storage(self.__hash(tag), encrypted_line.encode())
+        self._append_line_to_storage(self.__hash(tag), encrypted_line.encode())
 
     def generate_password(self, length: int, no_special_symbols=False, no_letters=False):
         """Generates a password based on the params"""
@@ -384,37 +368,17 @@ class Keeper:
         self.remove_triplet(tag)
         self.store_triplet(new_tag, new_login, new_password)
 
-    def copy_locker(self, destination: str):
-        """ Copies current locker to the specified dir """
-        self.fs.copy_locker(destination)
-
-    def copy_token(self, destination: str):
-        """ Copies token to the specified dir """
-        self.fs.copy_token(destination)
-
-    def change_locker(self, locker_dir: str):
-        """ Changes current locker to provided directory """
-        self.fs.change_locker(locker_dir)
-
-    def get_current_locker(self):
-        """ Returns locker currently working with """
-        return self.fs.get_current_locker()
-
-    def reset(self):
-        """ Resets all the data from current locker """
-        self.fs.suicide()
-    
     def remove_triplet(self, tag: str):
         """ Removes triplet based on the tag """
-        self.fs.remove_line_from_storage(self.__hash(tag))
+        self._remove_line_from_storage(self.__hash(tag))
 
-    def is_salted(self):
+    def is_locker_salted(self):
         """ Checks is locker already salted """
-        return SaltManager(self._salt_size, self.fs.locker).exists()
+        return SaltManager(self._salt_size, self.locker_file).exists()
 
     def token_exists(self):
         """Checks is token exist"""
-        return SaltManager(self._token_size, self.fs.token_file).exists()
+        return SaltManager(self._token_size, self.token_file).exists()
 
 ## CLI Interface functions & high level addons
 
@@ -437,45 +401,42 @@ def message(do_message: bool):
         print("If you want to use your lockers on multiple devices, you need the same token.")
         print('You can get your token with "copy --token" command, then move it to ~/.local/share/keeper\n')
 
-        print(red("[WARNING!] Make sure to remember this passphrase! as losing it"))
-        print(red("means you will not be able to recover your encrypted passwords.\n"))
+        print("[WARNING!] Make sure to remember this passphrase! as losing it")
+        print("means you will not be able to recover your encrypted passwords.\n")
 
 def console_registrate(keeper: Keeper):
     message(not keeper.token_exists())
-
-    print("\033[35mCurrent locker: ", keeper.get_current_locker() + '\033[0m\n')
+    print("Current locker: ", keeper.get_current_locker())
 
     while True:
-        passphrase = getpass(green("Create passphrase for the locker: "))
+        passphrase = getpass("Create passphrase for the locker: ")
 
         if len(passphrase) < 3:
-            print(red("Passphrase is too short"))
+            print("Passphrase is too short")
             continue
 
-        repeated = getpass(green("Repeat passphrase: "))
+        repeated = getpass("Repeat passphrase: ")
 
         if passphrase == repeated:
-            print(green("Passphrase created"))
-            keeper.verify_key(passphrase)
-            return
-        
+            print("Passphrase created")
+            return keeper.verify_key(passphrase)
         else:
-            print(red("Passwords don't match"))
+            print("Passphrases don't match")
 
 def console_auth(keeper: Keeper):
-    current_locker = blue(f"[{keeper.get_current_locker()}] ")
+    current_locker = f"[{keeper.get_current_locker()}] "
 
     while True:
-        passphrase = getpass(f"\033[95mPassphrase: {current_locker}\033[0m")
+        passphrase = getpass(f"Passphrase: {current_locker}")
 
         if keeper.verify_key(passphrase):
             return
         
         else:
-            print(red("Incorrect passphrase, try again"))
+            print("Incorrect passphrase, try again")
 
 def print_locker(locker: str):
-    print(f"\n\033[32mCurrent locker: \033[36m{locker}\n\033[0m")
+    print(f"Current locker: {locker}")
 
 def print_triplet(triplet: tuple, hidden_password=True):
     print('\nTag:', triplet[0])
@@ -490,68 +451,67 @@ def print_triplets(triplets: list[tuple], is_hidden=True):
     print('')    
 
 def delete_locker(keeper: Keeper):
-    choice = input(red("Are you sure you want to delete all the data from the current locker? [y/N] "))
+    choice = input("Are you sure you want to delete all the data from the current locker? [y/N] ")
 
     if 'y' == choice.lower():
         keeper.reset()
-        print(green("Data reseted"))
-        return
+        return print("Data reseted")
 
     else:
-        print(green("Aboarting.."))
+        print("Aboarting..")
 
 def change_locker(new_locker: str, keeper: Keeper):
     try:
         keeper.change_locker(new_locker)
-        print(green(f'\nSuccesfuly changed current locker to : {new_locker}\n'))
+        print(f'\nSuccesfuly changed current locker to : {new_locker}\n')
 
     except FileNotFoundError:
-        print(red(f"\nCould not find: {new_locker}\n"))
+        print(f"\nCould not find: {new_locker}\n")
 
     except ValueError:
-        print(red(f"\n{new_locker} should be a .lk file\n"))
+        print(f"\n{new_locker} should be a .lk file\n")
 
     except AssertionError:
-        print(red(f"\n{new_locker} is current locker\n"))
+        print(f"\n{new_locker} is current locker\n")
 
 def add_triplet(tag: str, keeper: Keeper, do_show_password=False, password=None):
     if keeper.get_triplet(tag):
-        print(red(f"Triplet with tag '{tag}' already exists.\n"))
-        return
+        print(f"Triplet with tag '{tag}' already exists.\n")
+        return 0
 
-    print(blue(f'\nCreating new triplet with tag "{tag}"\n'))
+    print(f'\nCreating new triplet with tag "{tag}"\n')
 
     while True:
-        login = input("\033[36mEnter the login: ")
+        login = input("Enter the login: ")
 
         if len(login):
             break
 
-        print(red("Login can not be empty!"))
+        print("Login can not be empty!")
 
 
     if not password:
         while True:
             if do_show_password:
-                password = input("\033[35mEnter the password [󰈈] : ")
+                password = input("Enter the password [󰈈] : ")
 
             else:
-                password = getpass("\033[35mEnter the password: ")
+                password = getpass("Enter the password: ")
 
             if len(password):            
                 break
 
-            print(red("Password can not be empty!"))
+            print("Password can not be empty!")
 
     keeper.store_triplet(tag, login, password)
-    print(green(f"Triplet successfully stored with the tag: {tag}"))
+    print(f"Triplet successfully stored with the tag: {tag}")
 
 
 def get_password(tag: str, keeper: Keeper, no_clipboard=False):
     triplet = keeper.get_triplet(tag)
 
     if triplet is None:
-        print(red(f'Could not find triplet with tag: {tag}'))
+        print(f'Could not find triplet with tag: {tag}')
         return
 
     if no_clipboard:
@@ -559,14 +519,14 @@ def get_password(tag: str, keeper: Keeper, no_clipboard=False):
 
     else:
         add_to_clipboard(triplet[2])
-        print(green("Password added to the clipboard!"))
+        print("Password added to the clipboard!")
 
 
 def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
     triplet = keeper.get_triplet(tag)
 
     if triplet is None:
-        print(red(f'Could not find triplet with tag: {tag}'))
+        print(f'Could not find triplet with tag: {tag}')
         return
 
     if no_clipboard:
@@ -574,46 +534,45 @@ def get_login(tag: str,  keeper: Keeper, no_clipboard=False):
 
     else:
         add_to_clipboard(triplet[1])
-        print(green("Login added to the clipboard!"))
+        print("Login added to the clipboard!")
 
 def search(tag: str, do_show: bool, keeper: Keeper):
     found = keeper.search_for_triplet(tag)
-    print_triplets(found, do_show)
+    print_triplets(found, not do_show)
     del found
 
 def remove_by_tag(tag: str, keeper: Keeper, no_confirm=False):
     triplet = keeper.get_triplet(tag)
 
     if triplet is None:
-        print(red(f"Could not find triplet with tag: {tag}"))
-        return
+        return print(f"Could not find triplet with tag: {tag}")
 
     print_triplet(triplet)
     print('')
 
     if not no_confirm:
-        remove = input(red("Delete this triplet? [y/N] "))
+        remove = input("Delete this triplet? [y/N] ")
 
         if 'y' != remove.lower():
-            print(green("Aboarting.."))
+            print("Aboarting..")
             return
 
     keeper.remove_triplet(tag)
-    print(green("Triplet deleted"))
+    print("Triplet deleted")
 
 def edit(tag: str, keeper: Keeper):
     triplet = keeper.get_triplet(tag)
 
     if triplet is None:
-        print(red(f"Could not find triplet with tag: {tag}"))
+        print(f"Could not find triplet with tag: {tag}")
         return
 
-    print(green(f'\nEditing triplet with tag "{tag}"'))
-    print(blue("\nParameters that can be edited: \n\t0 - tag \n\t1 - login \n\t2 - password\n"))
+    print(f'\nEditing triplet with tag "{tag}"')
+    print("\nParameters that can be edited: \n\t0 - tag \n\t1 - login \n\t2 - password\n")
 
     while True:
         try:
-            param = int(input(green("Enter the parameter to edit (0-2): ")))
+            param = int(input("Enter the parameter to edit (0-2): "))
 
         except:
             param = -1
@@ -622,54 +581,57 @@ def edit(tag: str, keeper: Keeper):
             break
 
         else:
-            print(red("Incorrect parameter"))
+            print("Incorrect parameter")
 
     while True:
-        value = input(green(f'Enter new value for \"{("tag", "login", "password")[param]}\": '))
+        value = input(f'Enter new value for \"{("tag", "login", "password")[param]}\": ')
 
         try:
             keeper.edit_triplet_property(tag, param, value)
             break
 
         except ValueError:
-            print(red(f'Triplet with tag "{value}" already exist'))
+            print(f'Triplet with tag "{value}" already exist')
 
-    print(green(f'Succesfully edited triplet with tag: "{tag}"'))
+    print(f'Succesfully edited triplet with tag: "{tag}"')
 
 def copy(dest: str, keeper: Keeper):
     try:
         keeper.copy_locker(dest)
-        print(green(f'Succesfuly copied current locker to "{dest}"'))
+        print(f'Succesfuly copied current locker to "{dest}"')
 
     except:
-        print(red(f"Could not find destination dir: {dest}"))
+        print(f"Could not find destination dir: {dest}")
     
 def copy_token(dest: str, keeper: Keeper):
     try:
         keeper.copy_token(dest)
-        print(green(f'Succesfuly copied token to "{dest}"'))
+        print(f'Succesfuly copied token to "{dest}"')
 
     except:
-        print(red(f"Could not find destination dir: {dest}"))
+        print(f"Could not find destination dir: {dest}")
 
-def generate_password_and_store(tag: str, length: int, syms: bool, letters: bool, keeper: Keeper, do_not_paste=False):
+def generate_password_and_store(tag: str, length: int, 
+    no_syms: bool, no_letters: bool, keeper: Keeper, do_not_paste=False):
+    generated_password = keeper.generate_password(length, no_syms, no_letters)
     
-    generated_password = keeper.generate_password(length, syms, letters)
-    print(green("Password is generated."))
+    if add_triplet(tag, keeper, password=generated_password) == 0:
+        return
 
-    if not do_not_paste and add_triplet(tag, keeper, password=generated_password) != 2:
+    if not do_not_paste:
         add_to_clipboard(generated_password)
-        print(green("Generated password added to the clipboard!"))
+        print("Generated password added to the clipboard!")
+    else:
+        print(f"Password is generated and stored with the tag: {tag}")
 
 def main(args: ArgumentParser, keeper: Keeper):    
     try:
-
         if args.command == 'change':
             change_locker(args.dir, keeper)
-        
+
         elif args.command == 'current':
-            print_locker(keeper.get_current_locker())
-        
+            print_locker(keeper.get_current_locker(args.full))
+
         elif args.command == 'copy':
             dest = args.dir if args.dir else '.'
             if args.token:
@@ -677,22 +639,20 @@ def main(args: ArgumentParser, keeper: Keeper):
             else:
                 copy(dest, keeper)
 
-        if args.command == 'add':
+        elif args.command == 'add':
             for t in args.tag:
                 add_triplet(t, keeper, args.show_password)
 
         elif args.command == 'remove':
             for t in args.tag:
-                remove_by_tag(t, keeper, args.no_ask)
+                remove_by_tag(t, keeper, args.no_confirm)
 
         elif args.command == 'get':
             tag = args.tag
-
             if args.login:
-                get_login(tag, keeper, args.no_clipboard)
-
+                get_login(tag, keeper, args.print_stdout)
             else:
-                get_password(tag, keeper, args.no_clipboard)
+                get_password(tag, keeper, args.print_stdout)
 
         elif args.command == 'edit':
             for t in args.tag:
@@ -700,27 +660,25 @@ def main(args: ArgumentParser, keeper: Keeper):
 
         elif args.command == 'list':
             items = keeper.list_triplets()
-
             if args.num:
                 print(len(items))
             else:
-                print_triplets(items, not args.all)
-
+                print_triplets(items, not args.show)
             del items
 
         elif args.command == 'search':
-            search(args.tag, not args.all, keeper)
+            search(args.tag, args.show, keeper)
 
         elif args.command == 'shred-locker':
             delete_locker(keeper)
 
         elif args.command == 'generate':
             tag = args.tag
-
             generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
 
+
     except KeyboardInterrupt:
-        return print(green('\nAborting...'))
+        return print('\nAborting...')
 
 if __name__ == '__main__':
     p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
@@ -733,24 +691,23 @@ if __name__ == '__main__':
 
     remove_parser = subparsers.add_parser('remove', help='Remove a triplet based on tag or tags.')
     remove_parser.add_argument('tag', metavar='TAG(S)', type=str, nargs='+', help='Tag(s) of the triplet(s) to remove.')
-    remove_parser.add_argument('-na', '--no-ask', action='store_true', help='Do not confirm deleting of a triplet')
+    remove_parser.add_argument('-nc', '--no-confirm', action='store_true', help='Do not confirm deleting of a triplet')
 
     get_parser = subparsers.add_parser('get', help='Retrieve login or password based on tag.')
     get_parser.add_argument('tag', metavar='TAG', type=str, help='Tag of the triplet to get.')
-    get_parser.add_argument('-nc', '--no-clipboard', action='store_true',help='Instead of copying to the clipboard, will print to the terminal.')
-
     get_parser.add_argument('-l', '--login', action='store_true', help='Return the login to the clipboard instead of password.')
+    get_parser.add_argument('-ps', '--print-stdout', action='store_true',help='Instead of copying to the clipboard, print to the stdout.')
 
     edit_parser = subparsers.add_parser('edit', help='Interactively edit parameters of a triplet.')
     edit_parser.add_argument('tag', metavar='TAG(S)', type=str, nargs='+', help='Tag(s) of the triplet(s) to edit.')
 
     list_parser = subparsers.add_parser('list', help='List all stored triplets.')
-    list_parser.add_argument('-a', '--all', action='store_true', help='Include passwords in the listing.')
+    list_parser.add_argument('-s', '--show', action='store_true', help='Include passwords in the listing.')
     list_parser.add_argument('-n', '--num', action='store_true', help='Output number of passwords instead of printing each one.')
 
     search_parser = subparsers.add_parser('search', help='Search for a triplets with similar tag.')
     search_parser.add_argument('tag', metavar='TAG', type=str, help='Similar tag to search for.')
-    search_parser.add_argument('-a', '--all', action='store_true', help='Show passwords for every found triplet')
+    search_parser.add_argument('-s', '--show', action='store_true', help='Show passwords for every found triplet')
 
     generate_parser = subparsers.add_parser('generate', help="Generates a password and stores it with provided tag")
     generate_parser.add_argument('tag', metavar='TAG', type=str, help='Tag for the new triplet.')
@@ -767,6 +724,7 @@ if __name__ == '__main__':
     copy_parser.add_argument('-t', '--token', action='store_true', help='Instead of copying current locker file, copy token to the provided directory.')
 
     current_parser = subparsers.add_parser('current', help='Prints directory of the current locker in use.')
+    current_parser.add_argument('-f', '--full', action='store_true', help='Print absolute path, include root passwords storage directory')
 
     shred_parser = subparsers.add_parser('shred-locker', help='Shreds current locker.')
 
@@ -775,17 +733,7 @@ if __name__ == '__main__':
     keeper = Keeper()
 
     try:
-        if args.command == 'change':
-            change_locker(args.dir, keeper)
-            sys_exit(0)
-        
-        elif args.command == 'current':
-            print_locker(keeper.get_current_locker())
-            sys_exit(0)
-
-        # A weird part of handling, just not to stuck if you forgot password and want to change locker
-
-        if not keeper.is_salted():
+        if not keeper.is_locker_salted():
             console_registrate(keeper)
 
         else:
@@ -797,43 +745,42 @@ if __name__ == '__main__':
     if any(vars(args).values()):
         main(args, keeper)
 
-    else: # Entering loop
+    else:
         current_locker = keeper.get_current_locker()
         while True:
             try:
-                if not keeper.is_salted():
-                    console_registrate(keeper)
-                    current_locker = keeper.get_current_locker()
-
-                elif current_locker != keeper.get_current_locker():
-                    # In case locker was changed
-                    console_auth(keeper)
+                if current_locker != keeper.get_current_locker() or not keeper.is_locker_salted():
+                    if not keeper.is_locker_salted():
+                        console_registrate(keeper)
+                    else:
+                        console_auth(keeper)
                     current_locker = keeper.get_current_locker()
 
                 command = input(">> ").strip()
 
                 if command.lower() in ("quit", "exit"):
-                    print(green("Exiting..."))
+                    print("Exiting...")
                     break
-                
+
                 elif command.lower() == 'help':
                     p.print_help()
                     continue
 
                 elif command.lower() == 'clear':
-                    os.system('clear')
+                    command = 'cls' if keeper.platform == 'Windows' else 'clear'
+                    os.system(command)
                     continue
+
 
                 args = p.parse_args(command.split())
 
                 if any(vars(args).values()):
                     main(args, keeper)
-
                 else:
                     continue
 
             except KeyboardInterrupt:
-                print(green("\nExiting..."))
+                print("\nExiting...")
                 break
 
             except SystemExit:
