@@ -40,6 +40,8 @@ def add_to_clipboard(content: str):
             raise e
 
 def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
+    # The main key derivation function. You can customize it however you want.
+    # But the length of derived key should be 32 bytes.
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -77,7 +79,25 @@ class SaltManager:
             with open(self.dir, 'rb') as f:
                 return f.read(self._size)
 
+class EventManager:
+    """Base event manager class for extensebility"""
+    _events = {}
+
+    def subscribe(self, event: str, function: object):    
+        if not event in self._events:
+            self._events[event] = [function]
+            return
+        self._events[event].append(function)
+
+    def trigger_event(self, *events: str):
+        for event in events:
+            if not event in self._events:
+                continue
+            for fn in self.__events[event]:
+                fn()
+
 class CrossPlatform:
+    """Base class to determine all directories for the file system"""
     def __init__(self):
         self.platform = pl_system()
         storage_dir = os.getenv("KEEPER_STORAGE_DIR")
@@ -103,43 +123,38 @@ class CrossPlatform:
 class FileSystem(CrossPlatform):
     """
     A base layer class for the password's manager file system manipulations.
-    """
-
+    """    
     # Token is a randomly generated N bytes salt, which will be used 
     # as unique key part of the passphrase for every user. 
     # It's necessary because default salt is located in the locker file.
     # So to decrypt a locker, you need a locker file and the same generated token 
 
-    def __init__(self, header_size=64, salt_size=16):
+    # TODO remove auto token generation, generate it by special command
+
+    _header_size = 64
+
+    def __init__(self, salt_size=16):
         super().__init__()
         self.token_file = os.path.join(self.root_dir, 'token') 
-        self.current_locker_file = os.path.join(self.root_dir, '.current_locker') 
-        self._header_size=header_size
+        self.current_locker_file = os.path.join(self.root_dir, 'current_locker') 
         self._salt_size=salt_size
-        self.__init_root()
-        self.__sync_locker()
 
-    def __init_root(self):
         if not os.path.exists(self.current_locker_file):
             open(self.current_locker_file, 'w').close()
 
-    def __sync_locker(self):
-        current_locker =  self.get_current_locker()
-        self.locker_file = os.path.join(self.storage_dir, current_locker)
+        self.__sync_locker()
 
-        if not current_locker or not os.path.exists(self.locker_file):
+    def __sync_locker(self):
+        self.locker_file = self.get_current_locker()
+
+        if not self.locker_file or not os.path.exists(self.locker_file):
+            # Set to default locker
             self.locker_file = os.path.join(self.storage_dir, 'default.lk')
 
             if not os.path.exists(self.locker_file):
                 open(self.locker_file, 'w').close()
 
             self.change_locker('default.lk', same_ok=True)
-
-    def open_tmp_locker(self, tmp_locker: str):
-        if os.path.exists(tmp_locker):
-            self.locker_file = tmp_locker
-        else:
-            raise FileNotFoundError("Tmp locker doesn't exist")
 
     def _get_line_from_storage(self, header: bytes) -> bytes | None:
         with open(self.locker_file, 'rb') as locker:
@@ -176,29 +191,34 @@ class FileSystem(CrossPlatform):
             return os.remove(temp_file)
         os.replace(temp_file, self.locker_file)
 
-    def get_current_locker(self, is_full=False):
+    def get_current_locker(self, is_full=True):
         with open(self.current_locker_file) as f:                
             cl = f.read().strip()
-            return os.path.join(self.storage_dir, cl) if is_full else cl
+            if not is_full and cl.startswith(self.storage_dir):
+                return os.path.relpath(cl, self.storage_dir)
+            return cl
 
-    def change_locker(self, dest: str, same_ok=False) -> None:
-        if os.path.isdir(dest):
-            raise ValueError("Argument is a directory")
+    def change_locker(self, dest: str, same_ok=False, is_relative=False) -> None:
+        if is_relative:
+            # Destination is not a sub directory of storage_dir
+            dest = os.path.abspath(os.path.expanduser(dest))
+        else:
+            dest = os.path.join(self.storage_dir, dest)
         
-        tmpdest = os.path.join(self.storage_dir, dest)
-
-        if not os.path.exists(tmpdest):
-            default_locker = os.path.join(self.storage_dir, 'default.lk')
-            if tmpdest == default_locker:
+        if not os.path.exists(dest):
+            if dest == os.path.join(self.storage_dir, 'default.lk'):
                 open(self.locker_file, 'w').close()
             else:
                 raise FileNotFoundError("Could not find locker file")
-        
+
+        elif os.path.isdir(dest):
+            raise ValueError("Argument is a directory")
+
         elif dest == self.get_current_locker() and not same_ok:
             raise AssertionError("Same file")
         
         with open(self.current_locker_file, 'w') as f:
-            f.write(dest) # File keeps directories relative to the storage dir
+            f.write(dest) # Current locker file keeps absolute directories to the locker files !
 
         self.__sync_locker() # Sync locker file to the new locker
 
@@ -221,13 +241,14 @@ class FileSystem(CrossPlatform):
         except Exception as e:
             raise e
 
-class Keeper(FileSystem):
+class Keeper(FileSystem, EventManager):
     """
     Class for high level manipulations for a keeper password manager.
     """
 
     def __init__(self, token_size=32, salt_size=16, iterations=340000):
         super().__init__(salt_size=salt_size)
+        super().__init__()
         self._cipher = None
         self._salt_size = salt_size
         self._token_size = token_size
@@ -325,6 +346,7 @@ class Keeper(FileSystem):
         formatted_line = f"[ {tag} ] [ {login} ] [ {password} ]"
         encrypted_line = self.__encrypt(formatted_line) + '\n'
         self._append_line_to_storage(self.__hash(tag), encrypted_line.encode())
+        self.trigger_event("store")
 
     def generate_password(self, length: int, no_special_symbols=False, no_letters=False):
         """Generates a password based on the params"""
@@ -371,6 +393,7 @@ class Keeper(FileSystem):
     def remove_triplet(self, tag: str):
         """ Removes triplet based on the tag """
         self._remove_line_from_storage(self.__hash(tag))
+        self.trigger_event("remove")
 
     def is_locker_salted(self):
         """ Checks is locker already salted """
@@ -424,7 +447,7 @@ def console_registrate(keeper: Keeper):
             print("Passphrases don't match")
 
 def console_auth(keeper: Keeper):
-    current_locker = f"[{keeper.get_current_locker()}] "
+    current_locker = f"[{keeper.get_current_locker(is_full=False)}] "
 
     while True:
         passphrase = getpass(f"Passphrase: {current_locker}")
@@ -460,9 +483,9 @@ def delete_locker(keeper: Keeper):
     else:
         print("Aboarting..")
 
-def change_locker(new_locker: str, keeper: Keeper):
+def change_locker(new_locker: str, keeper: Keeper, is_abs = False):
     try:
-        keeper.change_locker(new_locker)
+        keeper.change_locker(new_locker, is_relative=is_abs)
         print(f'\nSuccesfuly changed current locker to : {new_locker}\n')
 
     except FileNotFoundError:
@@ -488,7 +511,6 @@ def add_triplet(tag: str, keeper: Keeper, do_show_password=False, password=None)
             break
 
         print("Login can not be empty!")
-
 
     if not password:
         while True:
@@ -627,7 +649,7 @@ def generate_password_and_store(tag: str, length: int,
 def main(args: ArgumentParser, keeper: Keeper):    
     try:
         if args.command == 'change':
-            change_locker(args.dir, keeper)
+            change_locker(args.dir, keeper, args.absolute)
 
         elif args.command == 'current':
             print_locker(keeper.get_current_locker(args.full))
@@ -718,6 +740,7 @@ if __name__ == '__main__':
 
     change_parser = subparsers.add_parser('change', help='Changes current locker file to provided.')
     change_parser.add_argument('dir', metavar='DIR', type=str, help='Directory to the new locker file.')
+    change_parser.add_argument('-a', '--absolute', action='store_true', help='Open a file out of the storage directory')
 
     copy_parser = subparsers.add_parser('copy', help='Copy current .lk or token file to the provided directory.')
     copy_parser.add_argument('dir', metavar='[DIR]', type=str, nargs='?', help='Directory to copy to. If no directory provided, copy to the current directory.')
@@ -770,7 +793,6 @@ if __name__ == '__main__':
                     command = 'cls' if keeper.platform == 'Windows' else 'clear'
                     os.system(command)
                     continue
-
 
                 args = p.parse_args(command.split())
 
