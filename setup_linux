@@ -9,15 +9,21 @@ check_sudo() {
 }
 
 # Remove old file if it exists
-if [ -f "keeper.c" ]; then
-    rm "keeper.c"
+if [ -f "build/keeper.c" ]; then
+    rm -rf build
+fi
+
+if [ -f "dist/keeper" ]; then
+    rm -rf dist
 fi
 
 echo "Compiling..."
+mkdir -p build
+mkdir -p dist
 
 # Compile the Python script with Cython
-cython3 -3 --embed -o keeper.c keeper.py
-gcc -O3 -mtune=native -march=native -I/usr/include/python3.12 -o keeper keeper.c -lpython3.12 -lpthread
+cython3 -3 --embed -o build/keeper.c keeper.py
+gcc -O3 -mtune=native -march=native -I/usr/include/python3.12 -o dist/keeper build/keeper.c -lpython3.12 -lpthread
 
 echo "Compiling finished.."
 
@@ -28,9 +34,5 @@ if [[ "$add_to_usr_bin" != "n" && "$add_to_usr_bin" != "N" ]]; then
     echo "Moving to /usr/bin ..."
     mv keeper /usr/bin/
     echo "File moved to /usr/bin."
-    echo "Finished."
-else
-    echo "Finished."
 fi
-
-rm keeper.c
+echo "finished"
