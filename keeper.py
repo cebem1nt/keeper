@@ -210,7 +210,7 @@ class FileSystem(CrossPlatform):
     def _append_line_to_storage(self, header: bytes, line: bytes):
         with open(self.locker_file, 'ab') as f:
             # Every line starts from a header which is used as an identifier for the line
-            f.write(header+line)
+            f.write(header+line+b'\n')
 
     def _get_line_from_storage(self, header: bytes) -> bytes | None:
         with open(self.locker_file, 'rb') as locker:
@@ -219,11 +219,11 @@ class FileSystem(CrossPlatform):
                 line_header = line[:self._header_size] # Getting header of the line
                 if line_header == header:
                     # If the header is that one we need, return content of the line
-                    return line[self._header_size:]
+                    return line[self._header_size:].rstrip(b'\n')
 
     def _remove_line_from_storage(self, header: bytes):
         temp_file = self.locker_file + '.tmp'
-        # Creating a temporary file to write conten from the original file
+        # Creating a temporary file to write content from the original file
         try:
             with open(self.locker_file, 'rb') as original, open(temp_file, 'wb') as tmp:
                 tmp.write(original.read(self._salt_size))
@@ -282,10 +282,10 @@ class Keeper(FileSystem, EventManager):
         self._token_size = token_size
         self._iterations = iterations
      
-    def __encrypt(self, data: str):
-        return self._cipher.encrypt(data.encode()).decode()
+    def __encrypt(self, data: str) -> bytes:
+        return self._cipher.encrypt(data.encode())
 
-    def __decrypt(self, encrypted_data: bytes):
+    def __decrypt(self, encrypted_data: bytes) -> str:
         return self._cipher.decrypt(encrypted_data).decode()
     
     def __hash(self, content: str):
@@ -294,7 +294,7 @@ class Keeper(FileSystem, EventManager):
     def _decrypt_triplet(self, line: bytes):
         restore_brackets = lambda text: text.replace("/]", "]").replace("/[", "[")
 
-        decrypted_line = restore_brackets(self.__decrypt(line).rstrip('\n'))
+        decrypted_line = restore_brackets(self.__decrypt(line))
         matches: list[str] = re.findall(r'\[\s*([^\]]+?)\s*\]', decrypted_line)
         
         if len(matches) == 3:
@@ -319,7 +319,7 @@ class Keeper(FileSystem, EventManager):
         try:
             self._set_cipher(passphrase)
             listed = self.list_triplets()
-            del listed
+            self.trigger_event("init")
             return True
         
         except InvalidToken:
@@ -372,8 +372,8 @@ class Keeper(FileSystem, EventManager):
         password = escape_brackets(password)
 
         formatted_line = f"[ {tag} ] [ {login} ] [ {password} ]"
-        encrypted_line = self.__encrypt(formatted_line) + '\n'
-        self._append_line_to_storage(self.__hash(tag), encrypted_line.encode())
+        encrypted_line = self.__encrypt(formatted_line)
+        self._append_line_to_storage(self.__hash(tag), encrypted_line)
         self.trigger_event("store")
 
     def generate_password(self, length: int, no_special_symbols=False, no_letters=False):

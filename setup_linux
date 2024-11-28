@@ -32,7 +32,7 @@ read -p "Would you like to move the compiled file to /usr/bin? (sudo required) [
 if [[ "$add_to_usr_bin" != "n" && "$add_to_usr_bin" != "N" ]]; then
     check_sudo
     echo "Moving to /usr/bin ..."
-    mv keeper /usr/bin/
+    cp dist/keeper /usr/bin/
     echo "File moved to /usr/bin."
 fi
 echo "finished"
