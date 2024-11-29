@@ -7,9 +7,9 @@ Stuff i will do:
 
 - [ ]  Normal Readme
 - [ ]  Git integration for remote usage
-- [ ]  Improve extensibility of the code
-- [ ]  Event system for extensibility
-- [ ]  Opening an .lk file out of working directory
+- [x]  Improve extensibility of the code
+- [x]  Event system for extensibility
+- [x]  Opening an .lk file out of working directory
 
 May be:
 
