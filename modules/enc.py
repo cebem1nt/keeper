@@ -5,8 +5,10 @@ from cryptography.hazmat.backends import default_backend
 from hashlib import sha256
 
 from base64 import urlsafe_b64encode as b64_encode
-
 import re
+
+# Main module for all cryptography stuff
+# TODO maybe try some AES backend instead of fernet
 
 def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
     # The main key derivation function. You can customize it however you want.
@@ -22,14 +24,13 @@ def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
 
 
 class CryptoSystem:
-    """Class for all cryptography manipulations"""
+    """Base cryptography class"""
+
     def __init__(self, iterations: int):
         self._iterations = iterations
 
-    def init_cipher(self, passphrase_bytes: bytes, 
-                          token: bytes, 
-                          salt: bytes ):
-
+    def init_cipher(self, passphrase_bytes: bytes, token: bytes, salt: bytes ):
+        """Impprtant function to initialize a Fernet instance for class."""
         self._cipher = Fernet(derive_key(passphrase_bytes, salt, token, self._iterations)) 
 
     def __encrypt(self, data: str) -> bytes:
@@ -49,6 +50,7 @@ class CryptoSystem:
         return sha256(content.encode()).hexdigest().encode()
 
     def encrypt_triplet(self, tag: str, login: str, password: str):
+        # Replace brackets to avoid formating issues
         escape_brackets = lambda text: text.replace("]", "/]").replace("[", "/[").strip()
             
         tag = escape_brackets(tag)
@@ -60,12 +62,12 @@ class CryptoSystem:
         return encrypted_line
 
     def decrypt_triplet(self, line: bytes):
+        # Restoring brackets back
         restore_brackets = lambda text: text.replace("/]", "]").replace("/[", "[")
         decrypted_line = restore_brackets(self.__decrypt(line))
         matches: list[str] = re.findall(r'\[\s*([^\]]+?)\s*\]', decrypted_line)
         
         if len(matches) == 3:
             return (matches[0], matches[1], matches[2])
-
         else:
             raise ValueError(f"File seems to be corrupted")

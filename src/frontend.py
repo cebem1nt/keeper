@@ -4,7 +4,8 @@ from getpass import getpass
 from subprocess import run as sub_run
 from os import environ
 
-from func.backend import Keeper
+from src.backend import Keeper
+from sys import exit as sys_exit
 
 def add_to_clipboard(content: str):
     try:
@@ -20,14 +21,14 @@ class CLI:
     def __init__(self):
         pass
         
-    def message(self, do_message: bool):
+    def message(self, do_message: bool, token_dir: str):
         if do_message:
             print("""\n
-            \033[36m/\\ /\\___  \033[35m___ _ __   ___ _ __     
-            \033[36m/ //_/ _ \\\033[35m/ _ \\ '_ \\ / _ \\ '__|   
+              \033[36m/\\ /\\___  \033[35m___ _ __   ___ _ __     
+             \033[36m/ //_/ _ \\\033[35m/ _ \\ '_ \\ / _ \\ '__|   
             \033[36m/ __ \\  __/\033[35m  __/ |_) |  __/ |   
             \033[36m\\/  \\/\\___|\033[35m\\___| .__/ \\___|_|   
-                        \033[35m |_|              
+                          \033[35m |_|              
                 \033[0m\n""")
 
             print("Keeper is a password manager designed to securely store your passwords locally.")
@@ -37,13 +38,16 @@ class CLI:
             print("Use the tag to retrieve detailed information about each triplet.")
             print("Lockers are encrypted with a passphrase and your unique token.")
             print("If you want to use your lockers on multiple devices, you need the same token.")
-            print('You can get your token with "copy --token" command, then move it to ~/.local/share/keeper\n')
 
-            print("[WARNING!] Make sure to remember this passphrase! as losing it")
+            print(f"\033[33m[WARNING!]\033[0m You don't have a token yet. Generate it by 'keeper generate-token'")
+            print(f"or insert your existing token to {token_dir}")
+            print(f'You can get your token with "copy --token" command, then move it to {token_dir}\n')
+            print("\033[33m[WARNING!]\033[0m Make sure to remember this passphrase! as losing it")
             print("means you will not be able to recover your encrypted passwords.\n")
+            sys_exit(1)
 
     def console_registrate(self, keeper: Keeper):
-        self.message(not keeper.token_exists())
+        self.message(not keeper.token_exists(), keeper.token_file)
         print("Current locker: ", keeper.get_current_locker_dir())
 
         while True:
@@ -67,11 +71,15 @@ class CLI:
         while True:
             passphrase = getpass(f"Passphrase: {current_locker}")
 
-            if keeper.verify_key(passphrase):
-                return
+            try:
+                if keeper.verify_key(passphrase):
+                    return
             
-            else:
-                print("Incorrect passphrase, try again")
+                else:
+                    print("Incorrect passphrase, try again")
+            except ValueError:
+                print(f"You haven't a token yet. Generate it by 'keeper generate-token' or set it manually to {keeper.token_file}")
+                sys_exit(1)
 
     def print_locker(self, locker: str):
         print(f"Current locker: {locker}")
@@ -260,3 +268,72 @@ class CLI:
             print("Generated password added to the clipboard!")
         else:
             print(f"Password is generated and stored with the tag: {tag}")
+
+    def generate_token(self, keeper: Keeper):
+        print("Generating token...")
+        try:
+            keeper.generate_token()
+            print("Token was generated")
+        except AssertionError:
+            print(f"Token already exists at {keeper.token_file}")
+
+def main(args, keeper: Keeper, cli: CLI):
+    """
+    Main entry function, used to start frontend functionality.
+    """
+    try:
+        if args.command == 'change':
+            cli.change_locker(args.dir, keeper, args.absolute)
+
+        elif args.command == 'current':
+            cli.print_locker(keeper.get_current_locker_dir(args.full))
+
+        elif args.command == 'copy':
+            dest = args.dir if args.dir else '.'
+            if args.token:
+                cli.copy_token(dest, keeper)
+            else:
+                cli.copy(dest, keeper)
+
+        elif args.command == 'add':
+            for t in args.tag:
+                cli.add_triplet(t, keeper, args.show_password)
+
+        elif args.command == 'remove':
+            for t in args.tag:
+                cli.remove_by_tag(t, keeper, args.no_confirm)
+
+        elif args.command == 'get':
+            tag = args.tag
+            if args.login:
+                cli.get_login(tag, keeper, args.print_stdout)
+            else:
+                cli.get_password(tag, keeper, args.print_stdout)
+
+        elif args.command == 'edit':
+            for t in args.tag:
+                cli.edit(t, keeper)
+
+        elif args.command == 'list':
+            items = keeper.list_triplets()
+            if args.num:
+                print(len(items))
+            else:
+                cli.print_triplets(items, not args.show)
+            del items
+
+        elif args.command == 'search':
+            cli.search(args.tag, args.show, keeper)
+
+        elif args.command == 'shred-locker':
+            cli.delete_locker(keeper)
+
+        elif args.command == 'generate':
+            tag = args.tag
+            cli.generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
+
+        elif args.command == 'generate-token':
+            print('No!')
+
+    except KeyboardInterrupt:
+        return print('\nAborting...')

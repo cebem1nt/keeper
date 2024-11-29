@@ -44,16 +44,20 @@ class SaltManager:
         except:
             return False
     
-    def get(self):
+    def generate(self):
+        salt = os.urandom(self._size)
+
+        with open(self.dir, 'wb') as f:
+            f.write(salt)
+
+        os.chmod(self.dir, S_IRUSR | S_IWUSR)
+        return salt
+
+    def get(self, auto_generate=True) -> bytes | None:
         if not self.exists():
-            salt = os.urandom(self._size)
-
-            with open(self.dir, 'wb') as f:
-                f.write(salt)
-
-            os.chmod(self.dir, S_IRUSR | S_IWUSR)
-            return salt
-
+            if auto_generate:
+                return self.generate()
+            return None
         else:
             with open(self.dir, 'rb') as f:
                 return f.read(self._size)
@@ -193,8 +197,13 @@ class FileSystem(CrossPlatform):
         """Checks is token exist"""
         return SaltManager(self._token_size, self.token_file).exists()
 
-    def get_token(self) -> bytes:
-        return SaltManager(self._token_size, self.token_file).get()
+    def get_token(self) -> bytes | None:
+        return SaltManager(self._token_size, self.token_file).get(auto_generate=False)
+
+    def generate_token(self):
+        if os.path.exists(self.token_file):
+            raise AssertionError("Token already exists")
+        SaltManager(self._token_size, self.token_file).generate()
 
     def get_salt(self) -> bytes :
         return SaltManager(self._salt_size, self.locker_file).get()

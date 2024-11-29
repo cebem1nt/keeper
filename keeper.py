@@ -2,8 +2,8 @@ from argparse import ArgumentParser
 from sys import exit as sys_exit
 from os import system as os_system
 
-from func.backend import Keeper
-from func.frontend import CLI
+from src.backend import Keeper
+from src.frontend import main, CLI
 
 # This is a project code for a minimalistic and at the same time 
 # functional python password manager. The following project 
@@ -16,61 +16,9 @@ from func.frontend import CLI
 # You can add some frontend functionality as a new abstract layer without any need
 # to modify file system or API. 
 
-def main(args: ArgumentParser, keeper: Keeper, cli: CLI):    
-    try:
-        if args.command == 'change':
-            cli.change_locker(args.dir, keeper, args.absolute)
-
-        elif args.command == 'current':
-            cli.print_locker(keeper.get_current_locker_dir(args.full))
-
-        elif args.command == 'copy':
-            dest = args.dir if args.dir else '.'
-            if args.token:
-                cli.copy_token(dest, keeper)
-            else:
-                cli.copy(dest, keeper)
-
-        elif args.command == 'add':
-            for t in args.tag:
-                cli.add_triplet(t, keeper, args.show_password)
-
-        elif args.command == 'remove':
-            for t in args.tag:
-                cli.remove_by_tag(t, keeper, args.no_confirm)
-
-        elif args.command == 'get':
-            tag = args.tag
-            if args.login:
-                cli.get_login(tag, keeper, args.print_stdout)
-            else:
-                cli.get_password(tag, keeper, args.print_stdout)
-
-        elif args.command == 'edit':
-            for t in args.tag:
-                cli.edit(t, keeper)
-
-        elif args.command == 'list':
-            items = keeper.list_triplets()
-            if args.num:
-                print(len(items))
-            else:
-                cli.print_triplets(items, not args.show)
-            del items
-
-        elif args.command == 'search':
-            cli.search(args.tag, args.show, keeper)
-
-        elif args.command == 'shred-locker':
-            cli.delete_locker(keeper)
-
-        elif args.command == 'generate':
-            tag = args.tag
-            cli.generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
-
-
-    except KeyboardInterrupt:
-        return print('\nAborting...')
+# Directories:
+# src: Main directory, where the main backend and frontend classes are located
+# modules: Modules directory; file system, cryptography etc
 
 if __name__ == '__main__':
     p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
@@ -120,11 +68,15 @@ if __name__ == '__main__':
     current_parser.add_argument('-f', '--full', action='store_true', help='Print absolute path, include root passwords storage directory')
 
     shred_parser = subparsers.add_parser('shred-locker', help='Shreds current locker.')
-
+    generate_token_parser = subparsers.add_parser('generate-token', help="Generates a new token.")
     args = p.parse_args()
 
     keeper = Keeper()
     cli = CLI()
+
+    if args.command == 'generate-token':
+        cli.generate_token(keeper)
+        sys_exit(0)
 
     try:
         if not keeper.is_locker_salted():

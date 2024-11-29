@@ -7,7 +7,7 @@ class Keeper(FileSystem, CryptoSystem):
     """
     Class for high level manipulations for a keeper password manager.
     """
-
+    # Events to run some functions on special events
     _events = {}
 
     def __init__(self, token_size=32, salt_size=16, iterations=340000):
@@ -25,7 +25,7 @@ class Keeper(FileSystem, CryptoSystem):
         for event in events:
             if not event in self._events:
                 continue
-            for fn in self.__events[event]:
+            for fn in self._events[event]:
                 fn()
 
     def verify_key(self, passphrase: str):
@@ -35,16 +35,16 @@ class Keeper(FileSystem, CryptoSystem):
         Returns true if a success, false otherwise
         """
         try:
-            self.init_cipher(passphrase.encode(), self.get_token(), self.get_salt())
-            listed = self.list_triplets()
-            self.trigger_event("init")
-            return True
-        
+            token = self.get_token()
+            if token:
+                self.init_cipher(passphrase.encode(), token, self.get_salt())
+                listed = self.list_triplets()
+                self.trigger_event("init")
+                return True
+            raise ValueError("Token wasn't generated!")
+            
         except AssertionError:
             return False
-        
-        except Exception as e:
-            raise e
 
     def list_triplets(self):
         """Returns a list of stored triplets"""
