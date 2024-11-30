@@ -24,6 +24,7 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
     Class for high level manipulations for a keeper password manager.
     By default keeper produces the following events:
         - "init" : On succesfull cipher initialization
+        - "exit" : On exiting 
         - "store" : On storing new triplet
         - "remove" : On triplet deleting
     """

@@ -17,8 +17,9 @@ from src.frontend import main, CLI
 # to modify file system or API. 
 
 # Directories:
-# src: Main directory, where the main backend and frontend classes are located
-# modules: Modules directory; file system, cryptography etc
+# src: Main directory, where the main backend and frontend and extentions classes are located
+# core: core modules directory; file system, cryptography etc
+
 
 if __name__ == '__main__':
     p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
@@ -73,6 +74,11 @@ if __name__ == '__main__':
 
     keeper = Keeper()
     cli = CLI()
+
+    # Initializing extentions:
+    from src.extentions import GitManager
+    git_manager = GitManager(keeper)
+    git_manager.subscribe()
 
     if args.command == 'generate-token':
         cli.generate_token(keeper)
@@ -130,3 +136,5 @@ if __name__ == '__main__':
 
             except SystemExit:
                 continue
+    
+    keeper.trigger_event('exit')

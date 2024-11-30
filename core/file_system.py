@@ -73,8 +73,6 @@ class FileSystem(CrossPlatform):
     # It's necessary because default salt is located in the locker file.
     # So to decrypt a locker, you need a locker file and the same generated token 
 
-    # TODO remove auto token generation, generate it by special command
-
     _header_size = 64
 
     def __init__(self, salt_size, token_size):
