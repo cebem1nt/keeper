@@ -1,19 +1,10 @@
 import random, string
 
-from modules.enc import CryptoSystem
-from modules.fs import FileSystem
+from core.cryptography import CryptoSystem
+from core.file_system import FileSystem
 
-class Keeper(FileSystem, CryptoSystem):
-    """
-    Class for high level manipulations for a keeper password manager.
-    """
-    # Events to run some functions on special events
+class EventManager:
     _events = {}
-
-    def __init__(self, token_size=32, salt_size=16, iterations=340000):
-        FileSystem.__init__(self, salt_size=salt_size, token_size=token_size)
-        CryptoSystem.__init__(self, iterations=iterations)
-        self._cipher = None
 
     def subscribe(self, event: str, function: object):    
         if not event in self._events:
@@ -27,6 +18,20 @@ class Keeper(FileSystem, CryptoSystem):
                 continue
             for fn in self._events[event]:
                 fn()
+
+class Keeper(FileSystem, CryptoSystem, EventManager):
+    """
+    Class for high level manipulations for a keeper password manager.
+    By default keeper produces the following events:
+        - "init" : On succesfull cipher initialization
+        - "store" : On storing new triplet
+        - "remove" : On triplet deleting
+    """
+
+    def __init__(self, token_size=32, salt_size=16, iterations=340000):
+        FileSystem.__init__(self, salt_size=salt_size, token_size=token_size)
+        CryptoSystem.__init__(self, iterations=iterations)
+        self._cipher = None
 
     def verify_key(self, passphrase: str):
         """
