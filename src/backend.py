@@ -1,4 +1,4 @@
-import random, string
+import random, string, threading
 
 from core.cryptography import CryptoSystem
 from core.file_system import FileSystem
@@ -17,7 +17,8 @@ class EventManager:
             if not event in self._events:
                 continue
             for fn in self._events[event]:
-                fn()
+                thread = threading.Thread(target=fn)
+                thread.start()
 
 class Keeper(FileSystem, CryptoSystem, EventManager):
     """
@@ -29,7 +30,7 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
         - "remove" : On triplet deleting
     """
 
-    def __init__(self, token_size=32, salt_size=16, iterations=340000):
+    def __init__(self, token_size=32, salt_size=16, iterations=350000):
         FileSystem.__init__(self, salt_size=salt_size, token_size=token_size)
         CryptoSystem.__init__(self, iterations=iterations)
         self._cipher = None
