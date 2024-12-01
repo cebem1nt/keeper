@@ -17,7 +17,7 @@ class GitManager:
     def __init__(self, keeper: Keeper):
         self._keeper = keeper
         self.storage_dir = self._keeper.storage_dir
-        self._is_valid_dir = os.path.exists(os.path.join(self.storage_dir, '.git'))
+        self._git_dir = os.path.join(self.storage_dir, '.git')
 
     def _git_run(self, *args, capture_output=False, check=False, text=True):
         return subprocess.run(['git', '-C', self.storage_dir] + list(args), 
@@ -31,7 +31,7 @@ class GitManager:
             )
 
     def subscribe(self):
-        if self._is_valid_dir:
+        if os.path.exists(self._git_dir):
             self._keeper.subscribe('init', self.check_remote_changes)
             self._keeper.subscribe('exit', self.check_and_push)
         else:
@@ -55,9 +55,8 @@ class GitManager:
                     break
                 else:
                     print("Origin seems to be incorrect, try again")
-            
 
-            self._git_run('push', '-u', 'origin', 'main',)
+            self._git_run('push', '-u', 'origin', 'main')
         except:
             print("Aboarting repo creation...")
             rmtree(os.path.join(self.storage_dir, '.git'))

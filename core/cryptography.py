@@ -33,12 +33,12 @@ class CryptoSystem:
         """Impprtant function to initialize a Fernet instance for class."""
         self._cipher = Fernet(derive_key(passphrase_bytes, salt, token, self._iterations)) 
 
-    def __encrypt(self, data: str) -> bytes:
+    def encrypt(self, data: str) -> bytes:
         if self._cipher is None:
             raise ValueError("Cipher wasn't initialized")
         return self._cipher.encrypt(data.encode())
 
-    def __decrypt(self, encrypted_data: bytes) -> str:
+    def decrypt(self, encrypted_data: bytes) -> str:
         if self._cipher is None:
             raise ValueError("Cipher wasn't initialized")
         try:
@@ -58,13 +58,13 @@ class CryptoSystem:
         password = escape_brackets(password)
 
         formatted_line = f"[ {tag} ] [ {login} ] [ {password} ]"
-        encrypted_line = self.__encrypt(formatted_line)
+        encrypted_line = self.encrypt(formatted_line)
         return encrypted_line
 
     def decrypt_triplet(self, line: bytes):
         # Restoring brackets back
         restore_brackets = lambda text: text.replace("/]", "]").replace("/[", "[")
-        decrypted_line = restore_brackets(self.__decrypt(line))
+        decrypted_line = restore_brackets(self.decrypt(line))
         matches: list[str] = re.findall(r'\[\s*([^\]]+?)\s*\]', decrypted_line)
         
         if len(matches) == 3:
