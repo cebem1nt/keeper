@@ -74,7 +74,7 @@ class GitManager(Extension):
             print('Synchronizing...')
             self._git_run('add', '-A')
             self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
-            self._git_popen('push')
+            self._git_popen('push', '--force')
 
     def check_remote_changes(self):
         try:
