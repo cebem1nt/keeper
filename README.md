@@ -6,7 +6,7 @@ Keeper is a local cli password manager writen in python. Keeper is oriented to e
 Stuff i will do: 
 
 - [ ]  Normal Readme
-- [ ]  One .py setup script
+- [x]  One .py setup script
 - [x]  Git integration for remote usage
 - [x]  Improve extensibility of the code
 - [x]  Event system for extensibility

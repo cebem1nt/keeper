@@ -1,6 +1,6 @@
 @echo off
 
-pyinstaller --onefile keeper.py
+pyinstaller --onefile --hidden-import=src.extensions keeper.py
 
 if exist "dist\keeper.exe" (
     echo Compilation successful

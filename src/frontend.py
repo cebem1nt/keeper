@@ -18,8 +18,8 @@ def add_to_clipboard(content: str):
             raise e
 
 class CLI:
-    def __init__(self):
-        pass
+    def __init__(self, keeper: Keeper):
+        self.keeper = keeper
         
     def message(self, do_message: bool, token_dir: str):
         if do_message:
@@ -46,9 +46,9 @@ class CLI:
             print("means you will not be able to recover your encrypted passwords.\n")
             sys_exit(1)
 
-    def console_registrate(self, keeper: Keeper):
-        self.message(not keeper.token_exists(), keeper.token_file)
-        print("Current locker: ", keeper.get_current_locker_dir())
+    def registrate(self):
+        self.message(not self.keeper.token_exists(), self.keeper.token_file)
+        print("Current locker: ", self.keeper.get_current_locker_dir())
 
         while True:
             passphrase = getpass("Create passphrase for the locker: ")
@@ -61,24 +61,24 @@ class CLI:
 
             if passphrase == repeated:
                 print("Passphrase created")
-                return keeper.verify_key(passphrase)
+                return self.keeper.verify_key(passphrase)
             else:
                 print("Passphrases don't match")
 
-    def console_auth(self, keeper: Keeper):
-        current_locker = f"[{keeper.get_current_locker_dir(is_full=False)}] "
+    def auth(self):
+        current_locker = f"[{self.keeper.get_current_locker_dir(is_full=False)}] "
 
         while True:
             passphrase = getpass(f"Passphrase: {current_locker}")
 
             try:
-                if keeper.verify_key(passphrase):
+                if self.keeper.verify_key(passphrase):
                     return
             
                 else:
                     print("Incorrect passphrase, try again")
             except ValueError:
-                print(f"You haven't a token yet. Generate it by 'keeper generate-token' or set it manually to {keeper.token_file}")
+                print(f"You haven't a token yet. Generate it by 'keeper generate-token' or set it manually to {self.keeper.token_file}")
                 sys_exit(1)
 
     def print_locker(self, locker: str):
@@ -96,19 +96,19 @@ class CLI:
             self.print_triplet(triplet, is_hidden)
         print('')    
 
-    def delete_locker(self, keeper: Keeper):
+    def delete_locker(self):
         choice = input("Are you sure you want to delete all the data from the current locker? [y/N] ")
 
         if 'y' == choice.lower():
-            keeper.reset()
+            self.keeper.reset()
             return print("Data reseted")
 
         else:
             print("Aboarting..")
 
-    def change_locker(self, new_locker: str, keeper: Keeper, is_abs = False):
+    def change_locker(self, new_locker: str, is_abs = False):
         try:
-            keeper.change_locker_dir(new_locker, is_relative=is_abs)
+            self.keeper.change_locker_dir(new_locker, is_relative=is_abs)
             print(f'\nSuccesfuly changed current locker to : {new_locker}\n')
 
         except FileNotFoundError:
@@ -120,8 +120,8 @@ class CLI:
         except AssertionError:
             print(f"\n{new_locker} is current locker\n")
 
-    def add_triplet(self, tag: str, keeper: Keeper, do_show_password=False, password=None):
-        if keeper.get_triplet(tag):
+    def add_triplet(self, tag: str, do_show_password=False, password=None):
+        if self.keeper.get_triplet(tag):
             print(f"Triplet with tag '{tag}' already exists.\n")
             return 0
 
@@ -138,7 +138,7 @@ class CLI:
         if not password:
             while True:
                 if do_show_password:
-                    password = input("Enter the password [󰈈] : ")
+                    password = input("Enter the password [*] : ")
 
                 else:
                     password = getpass("Enter the password: ")
@@ -148,12 +148,12 @@ class CLI:
 
                 print("Password can not be empty!")
 
-        keeper.store_triplet(tag, login, password)
+        self.keeper.store_triplet(tag, login, password)
         print(f"Triplet successfully stored with the tag: {tag}")
 
 
-    def get_password(self, tag: str, keeper: Keeper, no_clipboard=False):
-        triplet = keeper.get_triplet(tag)
+    def get_password(self, tag: str, no_clipboard=False):
+        triplet = self.keeper.get_triplet(tag)
 
         if triplet is None:
             print(f'Could not find triplet with tag: {tag}')
@@ -167,8 +167,8 @@ class CLI:
             print("Password added to the clipboard!")
 
 
-    def get_login(self, tag: str,  keeper: Keeper, no_clipboard=False):
-        triplet = keeper.get_triplet(tag)
+    def get_login(self, tag: str, no_clipboard=False):
+        triplet = self.keeper.get_triplet(tag)
 
         if triplet is None:
             print(f'Could not find triplet with tag: {tag}')
@@ -181,13 +181,13 @@ class CLI:
             add_to_clipboard(triplet[1])
             print("Login added to the clipboard!")
 
-    def search(self, tag: str, do_show: bool, keeper: Keeper):
-        found = keeper.search_for_triplet(tag)
+    def search(self, tag: str, do_show: bool):
+        found = self.keeper.search_for_triplet(tag)
         self.print_triplets(found, not do_show)
         del found
 
-    def remove_by_tag(self, tag: str, keeper: Keeper, no_confirm=False):
-        triplet = keeper.get_triplet(tag)
+    def remove_by_tag(self, tag: str, no_confirm=False):
+        triplet = self.keeper.get_triplet(tag)
 
         if triplet is None:
             return print(f"Could not find triplet with tag: {tag}")
@@ -202,11 +202,11 @@ class CLI:
                 print("Aboarting..")
                 return
 
-        keeper.remove_triplet(tag)
+        self.keeper.remove_triplet(tag)
         print("Triplet deleted")
 
-    def edit(self, tag: str, keeper: Keeper):
-        triplet = keeper.get_triplet(tag)
+    def edit(self, tag: str):
+        triplet = self.keeper.get_triplet(tag)
 
         if triplet is None:
             print(f"Could not find triplet with tag: {tag}")
@@ -232,7 +232,7 @@ class CLI:
             value = input(f'Enter new value for \"{("tag", "login", "password")[param]}\": ')
 
             try:
-                keeper.edit_triplet_property(tag, param, value)
+                self.keeper.edit_triplet_property(tag, param, value)
                 break
 
             except ValueError:
@@ -240,27 +240,27 @@ class CLI:
 
         print(f'Succesfully edited triplet with tag: "{tag}"')
 
-    def copy(self, dest: str, keeper: Keeper):
+    def copy(self, dest: str):
         try:
-            keeper.copy_locker(dest)
+            self.keeper.copy_locker(dest)
             print(f'Succesfuly copied current locker to "{dest}"')
 
         except:
             print(f"Could not find destination dir: {dest}")
         
-    def copy_token(self, dest: str, keeper: Keeper):
+    def copy_token(self, dest: str):
         try:
-            keeper.copy_token(dest)
+            self.keeper.copy_token(dest)
             print(f'Succesfuly copied token to "{dest}"')
 
         except:
             print(f"Could not find destination dir: {dest}")
 
     def generate_password_and_store(self, tag: str, length: int, 
-        no_syms: bool, no_letters: bool, keeper: Keeper, do_not_paste=False):
-        generated_password = keeper.generate_password(length, no_syms, no_letters)
+        no_syms: bool, no_letters: bool, do_not_paste=False):
+        generated_password = self.keeper.generate_password(length, no_syms, no_letters)
         
-        if self.add_triplet(tag, keeper, password=generated_password) == 0:
+        if self.add_triplet(tag, password=generated_password) == 0:
             return
 
         if not do_not_paste:
@@ -269,71 +269,71 @@ class CLI:
         else:
             print(f"Password is generated and stored with the tag: {tag}")
 
-    def generate_token(self, keeper: Keeper):
+    def generate_token(self):
         print("Generating token...")
         try:
-            keeper.generate_token()
+            self.keeper.generate_token()
             print("Token was generated")
         except AssertionError:
-            print(f"Token already exists at {keeper.token_file}")
+            print(f"Token already exists at {self.keeper.token_file}")
 
-def main(args, keeper: Keeper, cli: CLI):
-    """
-    Main entry function, used to start frontend functionality.
-    """
-    try:
-        if args.command == 'change':
-            cli.change_locker(args.dir, keeper, args.absolute)
+    def main(self, args):
+        """
+        Main entry function, used to start frontend functionality.
+        """
+        try:
+            if args.command == 'change':
+                self.change_locker(args.dir, args.absolute)
 
-        elif args.command == 'current':
-            cli.print_locker(keeper.get_current_locker_dir(args.full))
+            elif args.command == 'current':
+                self.print_locker(self.keeper.get_current_locker_dir(args.full))
 
-        elif args.command == 'copy':
-            dest = args.dir if args.dir else '.'
-            if args.token:
-                cli.copy_token(dest, keeper)
-            else:
-                cli.copy(dest, keeper)
+            elif args.command == 'copy':
+                dest = args.dir if args.dir else '.'
+                if args.token:
+                    self.copy_token(dest)
+                else:
+                    self.copy(dest)
 
-        elif args.command == 'add':
-            for t in args.tag:
-                cli.add_triplet(t, keeper, args.show_password)
+            elif args.command == 'add':
+                for t in args.tag:
+                    self.add_triplet(t, args.show_password)
 
-        elif args.command == 'remove':
-            for t in args.tag:
-                cli.remove_by_tag(t, keeper, args.no_confirm)
+            elif args.command == 'remove':
+                for t in args.tag:
+                    self.remove_by_tag(t, args.no_confirm)
 
-        elif args.command == 'get':
-            tag = args.tag
-            if args.login:
-                cli.get_login(tag, keeper, args.print_stdout)
-            else:
-                cli.get_password(tag, keeper, args.print_stdout)
+            elif args.command == 'get':
+                tag = args.tag
+                if args.login:
+                    self.get_login(tag, args.print_stdout)
+                else:
+                    self.get_password(tag, args.print_stdout)
 
-        elif args.command == 'edit':
-            for t in args.tag:
-                cli.edit(t, keeper)
+            elif args.command == 'edit':
+                for t in args.tag:
+                    self.edit(t)
 
-        elif args.command == 'list':
-            items = keeper.list_triplets()
-            if args.num:
-                print(len(items))
-            else:
-                cli.print_triplets(items, not args.show)
-            del items
+            elif args.command == 'list':
+                items = self.keeper.list_triplets()
+                if args.num:
+                    print(len(items))
+                else:
+                    self.print_triplets(items, not args.show)
+                del items
 
-        elif args.command == 'search':
-            cli.search(args.tag, args.show, keeper)
+            elif args.command == 'search':
+                self.search(args.tag, args.show)
 
-        elif args.command == 'shred-locker':
-            cli.delete_locker(keeper)
+            elif args.command == 'shred-locker':
+                self.delete_locker()
 
-        elif args.command == 'generate':
-            tag = args.tag
-            cli.generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, keeper, args.no_paste)
+            elif args.command == 'generate':
+                tag = args.tag
+                self.generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, args.no_paste)
 
-        elif args.command == 'generate-token':
-            print('No!')
+            elif args.command == 'generate-token':
+                print('No.')
 
-    except KeyboardInterrupt:
-        return print('\nAborting...')
+        except KeyboardInterrupt:
+            return print('\nAborting...')

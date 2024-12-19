@@ -4,18 +4,25 @@ from shutil import rmtree
 
 import os, subprocess, sys, threading
 
-# This is a default extention example. Each extention must do the following:
+# This is a default extension example. Each extension must do the following:
 # - Take a keeper instance in init method (for events subscribing & interactions)
 # - Have a subscribe method: Here functions will be binded on special events
 
-# TODO : Make extentions to also extend cli interface and argparse
+# TODO : Make extensions to also extend cli interface and argparse
 
-class GitManager:
-    """
-    Git managing extention, to store passwords in a remote repo
-    """
+class Extension():
     def __init__(self, keeper: Keeper):
         self._keeper = keeper
+
+    def subscribe(self):
+        raise NotImplementedError()
+
+class GitManager(Extension):
+    """
+    Git managing extension, to store passwords in a remote repo
+    """
+    def __init__(self, keeper: Keeper):
+        super().__init__(keeper)
         self.storage_dir = self._keeper.storage_dir
         self._git_dir = os.path.join(self.storage_dir, '.git')
 

@@ -1,9 +1,12 @@
 from argparse import ArgumentParser
 from sys import exit as sys_exit
 from os import system as os_system
+from importlib import import_module
 
 from src.backend import Keeper
-from src.frontend import main, CLI
+from src.frontend import CLI
+
+import params
 
 # This is a project code for a minimalistic and at the same time 
 # functional python password manager. The following project 
@@ -20,6 +23,17 @@ from src.frontend import main, CLI
 # src: Main directory, where the main backend and frontend and extentions classes are located
 # core: core modules directory; file system, cryptography etc
 
+def init_extensions(keeper: Keeper, extensions_list: list[str]):
+    module = import_module('src.extensions')
+    instances = []
+
+    for extension in extensions_list:
+        cls = getattr(module, extension)
+        instance = cls(keeper=keeper)
+        instance.subscribe()
+        instances.append(instance)
+
+    return instances
 
 if __name__ == '__main__':
     p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
@@ -72,30 +86,30 @@ if __name__ == '__main__':
     generate_token_parser = subparsers.add_parser('generate-token', help="Generates a new token.")
     args = p.parse_args()
 
-    keeper = Keeper()
-    cli = CLI()
+    keeper = Keeper(
+        params.token_size, params.salt_size, params.iterations
+        )
+
+    frontend = CLI(keeper)
 
     # Initializing extentions:
-    from src.extentions import GitManager
-    git_manager = GitManager(keeper)
-    git_manager.subscribe()
+    extentions = init_extensions(keeper, params.active_extensions)
 
     if args.command == 'generate-token':
-        cli.generate_token(keeper)
+        frontend.generate_token()
         sys_exit(0)
 
     try:
         if not keeper.is_locker_salted():
-            cli.console_registrate(keeper)
-
+            frontend.registrate()
         else:
-            cli.console_auth(keeper)
+            frontend.auth()
 
     except KeyboardInterrupt:
         sys_exit(1)
 
     if any(vars(args).values()):
-        main(args, keeper, cli)
+        frontend.main(args)
 
     else:
         current_locker = keeper.get_current_locker_dir()
@@ -103,9 +117,9 @@ if __name__ == '__main__':
             try:
                 if current_locker != keeper.get_current_locker_dir() or not keeper.is_locker_salted():
                     if not keeper.is_locker_salted():
-                        cli.console_registrate(keeper)
+                        frontend.registrate()
                     else:
-                        cli.console_auth(keeper)
+                        frontend.auth()
                     current_locker = keeper.get_current_locker_dir()
 
                 command = input(">> ").strip()
@@ -126,7 +140,7 @@ if __name__ == '__main__':
                 args = p.parse_args(command.split())
 
                 if any(vars(args).values()):
-                    main(args, keeper, cli)
+                    frontend.main(args)
                 else:
                     continue
 
