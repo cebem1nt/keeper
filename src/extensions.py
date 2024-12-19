@@ -78,7 +78,7 @@ class GitManager(Extension):
 
     def check_remote_changes(self):
         try:
-            fetch = self._git_run('fetch')
+            fetch = self._git_run('fetch', capture_output=True)
             result = self._git_run('status', '-uno', capture_output=True)
 
             if 'Your branch is behind' in result.stdout:
