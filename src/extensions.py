@@ -33,7 +33,7 @@ class GitManager(Extension):
     def _git_popen(self, *args):
             return subprocess.Popen(
                 ['git', '-C', self.storage_dir] + list(args),
-                stdout=subprocess.PIPE, 
+                stdout=subprocess.DEVNULL, 
                 stderr=subprocess.PIPE
             )
 
@@ -71,18 +71,18 @@ class GitManager(Extension):
     def check_and_push(self):
         has_changes = self._git_run('status', '--porcelain', capture_output=True)
         if has_changes.stdout:
+            print('Synchronizing...')
             self._git_run('add', '-A')
-            self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}')
+            self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
             self._git_popen('push')
 
     def check_remote_changes(self):
         try:
-            fetch = self._git_popen('fetch')
-            fetch.wait()
+            fetch = self._git_run('fetch')
             result = self._git_run('status', '-uno', capture_output=True)
 
             if 'Your branch is behind' in result.stdout:
                 print("Remote changes detected, starting synchronization... ")
-                self._git_run('pull')
+                self._git_popen('pull')
         except subprocess.CalledProcessError as e:
             print(e)

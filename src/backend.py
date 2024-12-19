@@ -6,19 +6,27 @@ from core.file_system import FileSystem
 class EventManager:
     _events = {}
 
-    def subscribe(self, event: str, function: object):    
+    def subscribe(self, event: str, function: object, is_multi_thread=True):   
+        event_function_dict = {
+            'fn' : function,
+            'is_mt' : is_multi_thread
+        } 
+
         if not event in self._events:
-            self._events[event] = [function]
+            self._events[event] = [event_function_dict]
             return
-        self._events[event].append(function)
+        self._events[event].append(event_function_dict)
 
     def trigger_event(self, *events: str):
         for event in events:
             if not event in self._events:
                 continue
-            for fn in self._events[event]:
-                thread = threading.Thread(target=fn)
-                thread.start()
+            for event_function_dict in self._events[event]:
+                if event_function_dict['is_mt']:
+                    thread = threading.Thread(target=event_function_dict['fn'])
+                    thread.start()
+                else:
+                    event_function_dict['fn']()
 
 class Keeper(FileSystem, CryptoSystem, EventManager):
     """
