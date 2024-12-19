@@ -34,15 +34,15 @@ try:
             script = 'setup_win.bat'
 
         case 'Darwin' | 'Linux':
-            script = 'bash setup_linux.sh'
-
-        case _ :
             if 'TERMUX_VERSION' in os.environ:
                 script = 'bash setup_linux.sh -t'
                 termux = True
             else:
-                print("Ooops, your os is unsupported!")
-                sys.exit(1)    
+                script = 'bash setup_linux.sh'
+
+        case _ :
+            print("Ooops, your os is unsupported!")
+            sys.exit(1)    
 
     install_reqs(termux)
     subprocess.run(script, shell=True)
