@@ -1,8 +1,9 @@
 from src.backend import Keeper
 from datetime import datetime, timezone
 from shutil import rmtree
+from urllib import request
 
-import os, subprocess, sys, threading
+import os, subprocess
 
 # This is a default extension example. Each extension must do the following:
 # - Take a keeper instance in init method (for events subscribing & interactions)
@@ -23,6 +24,7 @@ class GitManager(Extension):
     """
     def __init__(self, keeper: Keeper):
         super().__init__(keeper)
+        self.has_internet = False
         self.storage_dir = self._keeper.storage_dir
         self._git_dir = os.path.join(self.storage_dir, '.git')
 
@@ -66,11 +68,11 @@ class GitManager(Extension):
             self._git_run('push', '-u', 'origin', 'main')
         except:
             print("Aboarting repo creation...")
-            rmtree(os.path.join(self.storage_dir, '.git'))
+            rmtree(self._git_dir)
     
     def check_and_push(self):
         has_changes = self._git_run('status', '--porcelain', capture_output=True)
-        if has_changes.stdout:
+        if has_changes.stdout and self.has_internet:
             print('Synchronizing...')
             self._git_run('add', '-A')
             self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
@@ -79,10 +81,12 @@ class GitManager(Extension):
     def check_remote_changes(self):
         try:
             fetch = self._git_run('fetch', capture_output=True)
-            result = self._git_run('status', '-uno', capture_output=True)
+            if fetch.returncode == 0:
+                self.has_internet = True    
+                result = self._git_run('status', '-uno', capture_output=True)
 
-            if 'Your branch is behind' in result.stdout:
-                print("Remote changes detected, starting synchronization... ")
+                if 'Your branch is behind' in result.stdout:
+                    print("Remote changes detected, starting synchronization... ")
                 self._git_popen('pull')
         except subprocess.CalledProcessError as e:
             print(e)
