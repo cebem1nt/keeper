@@ -199,10 +199,10 @@ class FileSystem(CrossPlatform):
         return SaltManager(self._token_size, self.token_file).get(auto_generate=False)
 
     def generate_token(self):
-        if os.path.exists(self.token_file):
-            raise AssertionError("Token already exists")
-        SaltManager(self._token_size, self.token_file).generate()
-
+        if not os.path.exists(self.token_file) or os.path.getsize(self.token_file) == 0: 
+            return SaltManager(self._token_size, self.token_file).generate()
+        raise AssertionError("Token already exists")
+    
     def get_salt(self) -> bytes :
         return SaltManager(self._salt_size, self.locker_file).get()
 

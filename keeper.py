@@ -88,15 +88,22 @@ if __name__ == '__main__':
 
     keeper = Keeper(
         params.token_size, params.salt_size, params.iterations
-        )
+    )
 
     frontend = CLI(keeper)
 
     # Initializing extentions:
     extentions = init_extensions(keeper, params.active_extensions)
+    # Operations that can be executed without password entring
+    no_auth_commands = ('generate-token', 'change', 'current')
 
-    if args.command == 'generate-token':
-        frontend.generate_token()
+    if args.command in no_auth_commands:
+        if args.command == 'generate-token':
+            frontend.generate_token()
+        elif args.command == 'change':
+            frontend.change_locker(args.dir, args.absolute)
+        else:
+            frontend.print_locker(keeper.get_current_locker_dir(args.full))
         sys_exit(0)
 
     try:

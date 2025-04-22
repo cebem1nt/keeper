@@ -1,7 +1,6 @@
 from src.backend import Keeper
 from datetime import datetime, timezone
 from shutil import rmtree
-from urllib import request
 
 import os, subprocess
 
