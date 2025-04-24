@@ -1,7 +1,7 @@
 import random, string, threading
 
-from core.cryptography import CryptoSystem
-from core.file_system import FileSystem
+from src.core.cryptography import CryptoSystem
+from src.core.file_system import FileSystem
 
 class EventManager:
     _events = {}
