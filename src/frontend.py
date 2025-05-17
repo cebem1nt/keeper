@@ -2,7 +2,7 @@ import pyperclip
 
 from getpass import getpass
 from subprocess import run as sub_run
-from os import environ
+from os import environ, system as os_system
 
 from src.backend import Keeper
 from sys import exit as sys_exit
@@ -316,7 +316,8 @@ class CLI:
                 args = parser.parse_args(command.split())
 
                 if any(vars(args).values()):
-                    self.handle_args(args)
+                    # If there were some interrupt, lets exit
+                    if self.handle_args(args) == 1: raise KeyboardInterrupt
                 else:
                     continue
 

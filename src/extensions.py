@@ -40,7 +40,7 @@ class GitManager(Extension):
 
     def subscribe(self):
         if os.path.exists(self._git_dir):
-            self._keeper.subscribe('init', self.check_remote_changes, False)
+            self._keeper.subscribe('init', self.check_remote_changes, is_multi_thread=False)
             self._keeper.subscribe('exit', self.check_and_push)
         else:
             create_repo = input("No repo in storage dir found, would you like to create one? [Y/n] ")
@@ -75,7 +75,7 @@ class GitManager(Extension):
             print('Synchronizing...')
             self._git_run('add', '-A')
             self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
-            self._git_popen('push', '--force')
+            self._git_run('push', '--force')
 
     def check_remote_changes(self):
         try:
