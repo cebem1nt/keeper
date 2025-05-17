@@ -23,7 +23,6 @@ class GitManager(Extension):
     """
     def __init__(self, keeper: Keeper):
         super().__init__(keeper)
-        self.has_internet = False
         self.storage_dir = self._keeper.storage_dir
         self._git_dir = os.path.join(self.storage_dir, '.git')
 
@@ -40,7 +39,7 @@ class GitManager(Extension):
 
     def subscribe(self):
         if os.path.exists(self._git_dir):
-            self._keeper.subscribe('init', self.check_remote_changes, is_multi_thread=False)
+            self._keeper.subscribe('init', self.check_changes, is_multi_thread=False)
             self._keeper.subscribe('exit', self.check_and_push)
         else:
             create_repo = input("No repo in storage dir found, would you like to create one? [Y/n] ")
@@ -71,17 +70,17 @@ class GitManager(Extension):
     
     def check_and_push(self):
         has_changes = self._git_run('status', '--porcelain', capture_output=True)
-        if has_changes.stdout and self.has_internet:
+
+        if has_changes.stdout:
             print('Synchronizing...')
             self._git_run('add', '-A')
             self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
             self._git_run('push', '--force')
 
-    def check_remote_changes(self):
+    def check_changes(self):
         try:
             fetch = self._git_run('fetch', capture_output=True)
             if fetch.returncode == 0:
-                self.has_internet = True    
                 result = self._git_run('status', '-uno', capture_output=True)
 
                 if 'Your branch is behind' in result.stdout:

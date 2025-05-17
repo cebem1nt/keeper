@@ -416,7 +416,6 @@ class CLI:
                     self.change_locker(args.dir, args.absolute)
                 else:
                     self.print_locker(self.keeper.get_current_locker_dir(args.full))
-                return
 
             else:                            
                 self.handle_args(args)
