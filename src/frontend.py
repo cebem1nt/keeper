@@ -47,15 +47,10 @@ class CLI:
             sys_exit(1)
 
     def auth(self) -> int:
-        try:
-            if not self.keeper.is_locker_salted():
-                self.registrate()
-            else:
-                self.login()
-            return 0
-
-        except KeyboardInterrupt:
-            return 1
+        if not self.keeper.is_locker_salted():
+            self.registrate()
+        else:
+            self.login()
 
     def registrate(self):
         self.message(not self.keeper.token_exists(), self.keeper.token_file)
@@ -294,8 +289,7 @@ class CLI:
         while True:
             try:
                 if current_locker != self.keeper.get_current_locker_dir() or not self.keeper.is_locker_salted():
-                    if self.auth() == 1:
-                        break
+                    self.auth()
                     current_locker = self.keeper.get_current_locker_dir()
 
                 command = input(">> ").strip()
@@ -334,10 +328,10 @@ class CLI:
                 continue
 
     def handle_args(self, args):
-        if not self.keeper.has_cipher():
-            self.auth()
-
         try:
+            if not self.keeper.has_cipher():
+                self.auth()
+
             if args.command == 'change':
                 self.change_locker(args.dir, args.absolute)
 
