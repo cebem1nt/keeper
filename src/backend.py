@@ -32,8 +32,6 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
     """
     Class for high level manipulations for a keeper password manager.
     By default keeper produces the following events:
-        - "init" : On keeper __init__ method initialization
-        - "exit" : On exiting 
         - "store" : On storing new triplet
         - "remove" : On triplet deleting
     """
@@ -41,7 +39,6 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
     def __init__(self, token_size=32, salt_size=16, iterations=350000):
         FileSystem.__init__(self, salt_size=salt_size, token_size=token_size)
         CryptoSystem.__init__(self, iterations=iterations)
-        self.trigger_event("init")
 
     def verify_key(self, passphrase: str):
         """

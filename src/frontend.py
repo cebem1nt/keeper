@@ -403,7 +403,9 @@ class CLI:
         # Objective: Proper handling, of authentification, interactive cli if no args
 
         # Operations that can be executed without password entering
+
         no_auth_commands = ('generate-token', 'change', 'current')
+        self.keeper.trigger_event("init")
 
         if args:
             if args.command in no_auth_commands:

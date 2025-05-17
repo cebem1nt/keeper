@@ -39,7 +39,7 @@ class GitManager(Extension):
 
     def subscribe(self):
         if os.path.exists(self._git_dir):
-            self._keeper.subscribe('init', self.check_changes, is_multi_thread=False)
+            self._keeper.subscribe('init', self.force_pull, is_multi_thread=True)
             self._keeper.subscribe('exit', self.check_and_push)
         else:
             create_repo = input("No repo in storage dir found, would you like to create one? [Y/n] ")
@@ -77,15 +77,9 @@ class GitManager(Extension):
             self._git_run('commit', '-m', f'sync {datetime.now(timezone.utc)}', capture_output=True)
             self._git_run('push', '--force')
 
-    def check_changes(self):
+    def force_pull(self):
         try:
-            fetch = self._git_run('fetch', capture_output=True)
-            if fetch.returncode == 0:
-                result = self._git_run('status', '-uno', capture_output=True)
-
-                if 'Your branch is behind' in result.stdout:
-                    print("Remote changes detected, starting synchronization... ")
-                    self._git_popen('pull')
+            self._git_popen('pull')
 
         except subprocess.CalledProcessError as e:
             print(e)
