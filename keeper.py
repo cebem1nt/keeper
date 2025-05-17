@@ -4,32 +4,33 @@ from os import system as os_system
 from importlib import import_module
 
 from src.backend import Keeper
-from src.frontend import CLI
+from src.frontend import Frontend
 
 import params
 
 # This is a project code for a minimalistic and at the same time 
-# functional python password manager. The following project 
-# For sequrity reasons, the following python code should be compiled.
-# You can use pyinstaller for it
+# functional & extensible python password manager. 
+# For sequrity reasons, it should be compiled.
+# You will need pyinstaller for it, then just run setup.py
 
 # This password manager built as a layered project, from the bottom where
-# files are getting manipulated, the medium where class provides some kind of API,
+# files are getting manipulated, the medium where Keeper class provides some kind of API,
 # to the frontend level. Beauty of it is that you do not have to modify the base.
 # You can add some frontend functionality as a new abstract layer without any need
 # to modify file system or API. 
 
-# Directories:
-# src: Main directory, where the main backend and frontend and extentions classes are located
-# core: core modules directory; file system, cryptography etc
+# Brief tour:
+# src/      -- Source directory. Frontend, backend and extensions files are there
+# src/core  -- Two files with basic functionality for a password manager: cryptography and a file system
+# params.py -- You can tweak some parameters of keeper's behaviour inside of it
 
 def init_extensions(keeper: Keeper, extensions_list: list[str]):
     module = import_module('src.extensions')
     instances = []
 
     for extension in extensions_list:
-        cls = getattr(module, extension)
-        instance = cls(keeper=keeper)
+        extension_class = getattr(module, extension)
+        instance = extension_class(keeper=keeper)
         instance.subscribe()
         instances.append(instance)
 
@@ -84,78 +85,26 @@ if __name__ == '__main__':
 
     shred_parser = subparsers.add_parser('shred-locker', help='Shreds current locker.')
     generate_token_parser = subparsers.add_parser('generate-token', help="Generates a new token.")
+
     args = p.parse_args()
 
     keeper = Keeper(
         params.token_size, params.salt_size, params.iterations
     )
 
-    frontend = CLI(keeper)
-
     # Initializing extentions:
     extentions = init_extensions(keeper, params.active_extensions)
-    # Operations that can be executed without password entring
-    no_auth_commands = ('generate-token', 'change', 'current')
 
-    if args.command in no_auth_commands:
-        if args.command == 'generate-token':
-            frontend.generate_token()
-        elif args.command == 'change':
-            frontend.change_locker(args.dir, args.absolute)
-        else:
-            frontend.print_locker(keeper.get_current_locker_dir(args.full))
-        sys_exit(0)
+    # - Frontend is a variable set in frontend.py that refers to a class that implements user interface functionality
+    # - Frontend itself should implement registration / authentification handling when it's needed
+    # - Frontend's main() function should implement proper arguments handling
+    # - If there is some kind of interactive cli in frontend, it should be used and implemented by frontend as well 
+    #   - keeper.py will pass None if no arguments.
+    #   - keeper.py will also pass parser instance.
 
-    try:
-        if not keeper.is_locker_salted():
-            frontend.registrate()
-        else:
-            frontend.auth()
-
-    except KeyboardInterrupt:
-        sys_exit(1)
-
+    frontend = Frontend(keeper=keeper)
+    
     if any(vars(args).values()):
         frontend.main(args)
-
     else:
-        current_locker = keeper.get_current_locker_dir()
-        while True:
-            try:
-                if current_locker != keeper.get_current_locker_dir() or not keeper.is_locker_salted():
-                    if not keeper.is_locker_salted():
-                        frontend.registrate()
-                    else:
-                        frontend.auth()
-                    current_locker = keeper.get_current_locker_dir()
-
-                command = input(">> ").strip()
-
-                if command.lower() in ("quit", "exit"):
-                    print("Exiting...")
-                    break
-
-                elif command.lower() == 'help':
-                    p.print_help()
-                    continue
-
-                elif command.lower() == 'clear':
-                    command = 'cls' if keeper.platform == 'Windows' else 'clear'
-                    os_system(command)
-                    continue
-
-                args = p.parse_args(command.split())
-
-                if any(vars(args).values()):
-                    frontend.main(args)
-                else:
-                    continue
-
-            except KeyboardInterrupt:
-                print("\nExiting...")
-                break
-
-            except SystemExit:
-                continue
-    
-    keeper.trigger_event('exit')
+        frontend.main(None, p)

@@ -41,7 +41,6 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
     def __init__(self, token_size=32, salt_size=16, iterations=350000):
         FileSystem.__init__(self, salt_size=salt_size, token_size=token_size)
         CryptoSystem.__init__(self, iterations=iterations)
-        self._cipher = None
 
     def verify_key(self, passphrase: str):
         """

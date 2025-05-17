@@ -4,34 +4,6 @@ from stat import S_IRUSR, S_IWUSR
 from shutil import copy as sh_copy
 from platform import system as pl_system
 
-class CrossPlatform:
-    """Base class to determine all directories for the file system on any system"""
-    def __init__(self):
-        self.platform = pl_system()
-        # Load custom user directory to store passwords, if it is not set
-        # or if this directory doesnt exist, fallback to default one
-        storage_dir = os.getenv("KEEPER_STORAGE_DIR")
-
-        if storage_dir is None or not os.path.exists(storage_dir):
-            # On linux, Windows etc this will set a dir at the home directory
-            storage_dir = os.path.join(os.path.expanduser('~'), '.keeper_storage')
-
-        # Root dir is a directory where all stuff for password manager to work will be stored
-        root_dirs = {
-            'Windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'keeper'),
-            'Linux'  : os.path.expanduser('~/.local/share/keeper'), 
-            'Darwin' : os.path.expanduser('~/.local/share/keeper'),
-        }
-
-        if self.platform in root_dirs:
-            self.storage_dir = storage_dir
-            self.root_dir = root_dirs[self.platform]
-            os.makedirs(self.root_dir, exist_ok=True)
-            os.makedirs(self.storage_dir, exist_ok=True)
-
-        else:
-            raise OSError(f"Unsuported os: {self.platform}")
-
 class SaltManager:
     def __init__(self, size: int, dir: str) -> None:
         self._size = size
@@ -62,23 +34,52 @@ class SaltManager:
             with open(self.dir, 'rb') as f:
                 return f.read(self._size)
 
+class CrossPlatform:
+    """Base class to determine all directories for the file system on any system"""
+    def __init__(self):
+        self.platform = pl_system()
+        # Load custom user directory to store passwords, if it is not set
+        # or if this directory doesnt exist, fallback to default one
+        storage_dir = os.getenv("KEEPER_STORAGE_DIR")
+
+        if storage_dir is None or not os.path.exists(storage_dir):
+            # On linux, Windows etc this will set a dir at the home directory
+            storage_dir = os.path.join(os.path.expanduser('~'), '.keeper_storage')
+
+        # Root dir is a directory where all stuff for password manager to work will be stored
+        root_dirs = {
+            'Windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'keeper'),
+            'Linux'  : os.path.expanduser('~/.local/share/keeper'), 
+            'Darwin' : os.path.expanduser('~/.local/share/keeper'),
+        }
+
+        if self.platform in root_dirs:
+            self.storage_dir = storage_dir
+            self.root_dir = root_dirs[self.platform]
+            os.makedirs(self.root_dir, exist_ok=True)
+            os.makedirs(self.storage_dir, exist_ok=True)
+
+        else:
+            raise OSError(f"Unsuported os: {self.platform}")
+
 class FileSystem(CrossPlatform):
     """
     A base layer class for the password's manager file system manipulations.
     """    
-    # Locker is a file where all the data is stored
+    # Locker file is a file where all the data is stored
 
-    # Token is a randomly generated N bytes salt, which will be used 
-    # as unique key part of the passphrase for every user. 
+    # Token is a randomly generated N bytes salt, used as pepper 
     # It's necessary because default salt is located in the locker file.
     # So to decrypt a locker, you need a locker file and the same generated token 
 
+    # Header is 64 chars sha256 string, which is an id fo each line
     _header_size = 64
 
     def __init__(self, salt_size, token_size):
         super().__init__()
         self._salt_size=salt_size
         self._token_size=token_size
+        self.locker_file = None
         self.token_file = os.path.join(self.root_dir, 'token') 
         self.current_locker_file = os.path.join(self.root_dir, 'current_locker') 
 
@@ -86,10 +87,10 @@ class FileSystem(CrossPlatform):
             # If there is no file with current locker directory, we create empty one
             open(self.current_locker_file, 'w').close()
 
+        # Sets locker_file variable based on context
         self.__sync_locker()
 
     def __sync_locker(self):
-        """A function to set current locker based on conditions"""
         # Getting current locker directory
         self.locker_file = self.get_current_locker_dir() 
 
@@ -208,7 +209,7 @@ class FileSystem(CrossPlatform):
 
 
     def reset(self, passes=3):
-        """Shreding *encrypted* file before deletion :)"""
+        """Shreding encrypted file before deletion :)"""
         try:
             file_size = os.path.getsize(self.locker_file)
             with open(self.locker_file, 'r+b') as f:

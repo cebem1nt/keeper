@@ -28,21 +28,25 @@ class CryptoSystem:
 
     def __init__(self, iterations: int):
         self._iterations = iterations
+        self.__cipher = None
 
     def init_cipher(self, passphrase_bytes: bytes, token: bytes, salt: bytes ):
         """Impprtant function to initialize a Fernet instance for class."""
-        self._cipher = Fernet(derive_key(passphrase_bytes, salt, token, self._iterations)) 
+        self.__cipher = Fernet(derive_key(passphrase_bytes, salt, token, self._iterations)) 
+
+    def has_cipher(self) -> bool:
+        return self.__cipher != None
 
     def encrypt(self, data: str) -> bytes:
-        if self._cipher is None:
+        if self.__cipher is None:
             raise ValueError("Cipher wasn't initialized")
-        return self._cipher.encrypt(data.encode())
+        return self.__cipher.encrypt(data.encode())
 
     def decrypt(self, encrypted_data: bytes) -> str:
-        if self._cipher is None:
+        if self.__cipher is None:
             raise ValueError("Cipher wasn't initialized")
         try:
-            return self._cipher.decrypt(encrypted_data).decode()
+            return self.__cipher.decrypt(encrypted_data).decode()
         except InvalidToken:
             raise AssertionError("Token doesn't match")
     

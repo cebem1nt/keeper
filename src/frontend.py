@@ -46,6 +46,17 @@ class CLI:
             print("means you will not be able to recover your encrypted passwords.\n")
             sys_exit(1)
 
+    def auth(self) -> int:
+        try:
+            if not self.keeper.is_locker_salted():
+                self.registrate()
+            else:
+                self.login()
+            return 0
+
+        except KeyboardInterrupt:
+            return 1
+
     def registrate(self):
         self.message(not self.keeper.token_exists(), self.keeper.token_file)
         print("Current locker: ", self.keeper.get_current_locker_dir())
@@ -65,7 +76,7 @@ class CLI:
             else:
                 print("Passphrases don't match")
 
-    def auth(self):
+    def login(self):
         current_locker = f"[{self.keeper.get_current_locker_dir(is_full=False)}] "
 
         while True:
@@ -277,10 +288,54 @@ class CLI:
         except AssertionError:
             print(f"Token already exists at {self.keeper.token_file}")
 
-    def main(self, args):
-        """
-        Main entry function, used to start frontend functionality.
-        """
+    def interactive_cli(self, parser: any):
+        current_locker = self.keeper.get_current_locker_dir()
+
+        while True:
+            try:
+                if current_locker != self.keeper.get_current_locker_dir() or not self.keeper.is_locker_salted():
+                    if self.auth() == 1:
+                        break
+                    current_locker = self.keeper.get_current_locker_dir()
+
+                command = input(">> ").strip()
+
+                if command.lower() in ("quit", "exit"):
+                    print("Exiting...")
+                    break
+
+                elif command.lower() == 'help':
+                    parser.print_help()
+                    continue
+
+                elif command.lower() == 'clear':
+                    command = 'cls' if self.keeper.platform == 'Windows' else 'clear'
+                    os_system(command)
+                    continue
+
+                args = parser.parse_args(command.split())
+
+                if any(vars(args).values()):
+                    self.handle_args(args)
+                else:
+                    continue
+
+            except KeyboardInterrupt:
+                print("\nExiting...")
+                break
+
+            # The point of this part of this except is that when argparse successfully 
+            # parses arguments and the command gets executed, it raises SystemExit. 
+            # Though we don't want it. Well keep call argaprse as much as user wants
+            # Although we raise SystemExit to :). It should be prevented here 
+
+            except SystemExit:
+                continue
+
+    def handle_args(self, args):
+        if not self.keeper.has_cipher():
+            self.auth()
+
         try:
             if args.command == 'change':
                 self.change_locker(args.dir, args.absolute)
@@ -337,3 +392,36 @@ class CLI:
 
         except KeyboardInterrupt:
             return print('\nAborting...')
+
+    def main(self, args: any, parser: any = None):
+        """
+        Main entry function, used to start frontend functionality.  
+        """
+
+        # Given: args or None and parser. 
+        # Objective: Proper handling, of authentification, interactive cli if no args
+
+        # Operations that can be executed without password entering
+        no_auth_commands = ('generate-token', 'change', 'current')
+
+        if args:
+            if args.command in no_auth_commands:
+                # Can be executed without any registration, because 
+                # these operations don't involve cryptography  
+
+                if args.command == 'generate-token':
+                    self.generate_token()
+                elif args.command == 'change':
+                    self.change_locker(args.dir, args.absolute)
+                else:
+                    self.print_locker(self.keeper.get_current_locker_dir(args.full))
+                return
+
+            else:                            
+                self.handle_args(args)
+        else:
+            self.interactive_cli(parser)
+
+        self.keeper.trigger_event('exit')
+
+Frontend = CLI
