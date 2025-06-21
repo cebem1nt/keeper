@@ -11,7 +11,8 @@ Stuff i will do:
 - [x]  Improve extensibility of the code
 - [x]  Event system for extensibility
 - [x]  Opening an .lk file out of working directory
-- [ ]  Portable build for keeper, accessing and managing passwords on flashdrive
+- [x]  Portable build for keeper, accessing and managing passwords on flashdrive
+- [ ]  AES encryption backend
 
 May be:
 

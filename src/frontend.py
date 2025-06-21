@@ -2,7 +2,7 @@ import pyperclip
 
 from getpass import getpass
 from subprocess import run as sub_run
-from os import environ, system as os_system
+from os import environ, name as os_name, system as os_system
 
 from src.backend import Keeper
 from sys import exit as sys_exit
@@ -44,7 +44,9 @@ class CLI:
             print(f'You can get your token with "copy --token" command, then move it to {token_dir}\n')
             print("\033[33m[WARNING!]\033[0m Make sure to remember this passphrase! as losing it")
             print("means you will not be able to recover your encrypted passwords.\n")
-            sys_exit(1)
+            
+            # Fix infinity loop on token creation
+            sys_exit(3)
 
     def auth(self) -> int:
         if not self.keeper.is_locker_salted():
@@ -277,11 +279,19 @@ class CLI:
 
     def generate_token(self):
         print("Generating token...")
+
         try:
             self.keeper.generate_token()
             print("Token was generated")
+
         except AssertionError:
             print(f"Token already exists at {self.keeper.token_file}")
+
+    def clear_screen(self):
+        if os_name == 'nt':
+            os_system('cls')
+        else: 
+            os_system('clear')
 
     def interactive_cli(self, parser: any):
         current_locker = self.keeper.get_current_locker_dir()
@@ -303,8 +313,7 @@ class CLI:
                     continue
 
                 elif command.lower() == 'clear':
-                    command = 'cls' if self.keeper.platform == 'Windows' else 'clear'
-                    os_system(command)
+                    self.clear_screen()
                     continue
 
                 args = parser.parse_args(command.split())
@@ -324,7 +333,9 @@ class CLI:
             # Though we don't want it. Well keep call argaprse as much as user wants
             # Although we raise SystemExit to :). It should be prevented here 
 
-            except SystemExit:
+            except SystemExit as e:
+                if e.code == 3:
+                    return
                 continue
 
     def handle_args(self, args):

@@ -1,4 +1,4 @@
-import os, random
+import os, random, sys
 
 from stat import S_IRUSR, S_IWUSR
 from shutil import copy as sh_copy
@@ -36,21 +36,34 @@ class SaltManager:
 
 class CrossPlatform:
     """Base class to determine all directories for the file system on any system"""
-    def __init__(self):
+    
+    def __init__(self, is_portable=False):
         self.platform = pl_system()
+
+        user_root = os.path.expanduser('~')
+        script_dir = os.path.dirname(sys.argv[0])
+
         # Load custom user directory to store passwords, if it is not set
         # or if this directory doesnt exist, fallback to default one
-        storage_dir = os.getenv("KEEPER_STORAGE_DIR")
+        
+        default_sd = os.path.join(user_root, '.keeper_storage')
+        storage_dir = os.getenv("KEEPER_STORAGE_DIR", default_sd)
 
-        if storage_dir is None or not os.path.exists(storage_dir):
-            # On linux, Windows etc this will set a dir at the home directory
-            storage_dir = os.path.join(os.path.expanduser('~'), '.keeper_storage')
+        if is_portable:
+            # If this is portable build, then everything should be located
+            # in the same directory where the script is. 
+            storage_dir = os.path.join(script_dir, 'storage')
+            self.platform = 'Portable'
+
+        elif not os.path.exists(storage_dir):
+            storage_dir = default_sd
 
         # Root dir is a directory where all stuff for password manager to work will be stored
         root_dirs = {
-            'Windows': os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'keeper'),
-            'Linux'  : os.path.expanduser('~/.local/share/keeper'), 
-            'Darwin' : os.path.expanduser('~/.local/share/keeper'),
+            'Windows' : os.path.join(os.getenv('LOCALAPPDATA', user_root), 'keeper'),
+            'Linux'   : os.path.expanduser('~/.local/share/keeper'), 
+            'Darwin'  : os.path.expanduser('~/.local/share/keeper'),
+            'Portable': os.path.join(script_dir, 'data'),
         }
 
         if self.platform in root_dirs:
@@ -75,8 +88,8 @@ class FileSystem(CrossPlatform):
     # Header is 64 chars sha256 string, which is an id fo each line
     _header_size = 64
 
-    def __init__(self, salt_size, token_size):
-        super().__init__()
+    def __init__(self, salt_size, token_size, is_portable=False):
+        super().__init__(is_portable)
         self._salt_size=salt_size
         self._token_size=token_size
         self.locker_file = None
@@ -220,6 +233,8 @@ class FileSystem(CrossPlatform):
                     f.write(bytearray(random.getrandbits(8) for _ in range(file_size)))
                     # Writes changes
                     f.flush()
+                    # Sync changes
+                    os.fsync(f.fileno())
             # Removes the file
             os.remove(self.locker_file)
             # Fall back to default locker

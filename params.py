@@ -20,5 +20,15 @@ salt_size = 16
 # Extensions that are included in build. Leave list empty to disable any
 active_extensions = ['GitManager']
 
+# Portable build. Will look for token, lokers in the directory
+# where the script is located.
+# Data like token should be located in keepr_dir/data/
+# .lk files should be located in keeper_dir/storage
+# Where keper_dir is the location where executable is located
+
+# Warning! Better compile it if using this param
+
+is_portable = False
+
 # In progress
 # backend = 'fernet' # 'AES' 

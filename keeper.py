@@ -89,11 +89,11 @@ if __name__ == '__main__':
     args = p.parse_args()
 
     keeper = Keeper(
-        params.token_size, params.salt_size, params.iterations
+        params.token_size, params.salt_size, params.iterations, params.is_portable
     )
 
-    # Initializing extentions:
-    extentions = init_extensions(keeper, params.active_extensions)
+    # Initializing extensions:
+    extensions = init_extensions(keeper, params.active_extensions)
 
     # - Frontend is a variable set in frontend.py that refers to a class that implements user interface functionality
     # - Frontend itself should implement registration / authentification handling when it's needed
