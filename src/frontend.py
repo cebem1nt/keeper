@@ -135,26 +135,30 @@ class CLI:
 
         print(f'\nCreating new triplet with tag "{tag}"\n')
 
-        while True:
-            login = input("Enter the login: ")
-
-            if len(login):
-                break
-
-            print("Login can not be empty!")
-
-        if not password:
+        try:
             while True:
-                if do_show_password:
-                    password = input("Enter the password [*] : ")
+                login = input("Enter the login: ")
 
-                else:
-                    password = getpass("Enter the password: ")
-
-                if len(password):            
+                if len(login):
                     break
 
-                print("Password can not be empty!")
+                print("Login can not be empty!")
+
+            if not password:
+                while True:
+                    if do_show_password:
+                        password = input("Enter the password [*] : ")
+
+                    else:
+                        password = getpass("Enter the password: ")
+
+                    if len(password):            
+                        break
+
+                    print("Password can not be empty!")
+
+        except KeyboardInterrupt as e:
+            raise e
 
         self.keeper.store_triplet(tag, login, password)
         print(f"Triplet successfully stored with the tag: {tag}")
