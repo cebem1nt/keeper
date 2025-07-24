@@ -94,6 +94,7 @@ You can setup syncronization between devices by adding repository to the directo
 
 __You can find your files with passwords in:__
 > ~/.keeper_storage (on linux, mac, termux)
+
 > C:\Users\<Username>\.keeper_storage
 
 Or alternatively you can set custom directory by setting __$KEEPER_STORAGE_DIR__ environment variable, for example:
@@ -105,6 +106,7 @@ Token is unique for each user and used like kind of salt or pepper for your encr
 
 __You can find your generated token in:__
 > ~/.local/share/keeper (on linux, mac, termux)
+
 > C:\Users\<Username>\AppData\Local\keeper (windows)
 
 Inside, project seems to be commented well.
