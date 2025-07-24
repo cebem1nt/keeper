@@ -4,7 +4,7 @@ Keeper is a local cli password manager writen in python. Keeper is oriented to e
 
 ## Tweaking
 
-Before installation, you can tweak your build modifying ```params.py```
+Before installation, you can tweak your build by modifying ```params.py```
 
 ```py
 # Number of iterations used to generate unique key.
