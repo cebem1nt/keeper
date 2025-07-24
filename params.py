@@ -3,7 +3,6 @@
 # key generated with '244444' iterations. 
 # More iterations, more time it takes to unlock the locker.
 # Optimal number of iterations is from 300000 to 400000
-# so you can add extra security layer by that  
 iterations = 333000 
 
 # Same with token size, but it will affect only new generated token. In case 

@@ -37,7 +37,7 @@ def init_extensions(keeper: Keeper, extensions_list: list[str]):
     return instances
 
 if __name__ == '__main__':
-    p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command.")
+    p = ArgumentParser(description="Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command, for example \"keeper add -h\"")
 
     subparsers = p.add_subparsers(dest='command', help='Available commands')
 
