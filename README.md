@@ -95,7 +95,7 @@ You can setup syncronization between devices by adding repository to the directo
 __You can find your files with passwords in:__
 > ~/.keeper_storage (on linux, mac, termux)
 
-> C:\Users\<Username>\.keeper_storage
+> C:\Users\<Username>\.keeper_storage (windows)
 
 Or alternatively you can set custom directory by setting __$KEEPER_STORAGE_DIR__ environment variable, for example:
 ```sh
