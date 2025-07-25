@@ -29,5 +29,5 @@ active_extensions = ['GitManager']
 
 is_portable = False
 
-# In progress
-# backend = 'fernet' # 'AES' 
+# Encryption backend to use
+backend = 'fernet' # 'AES' 

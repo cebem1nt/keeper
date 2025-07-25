@@ -36,9 +36,9 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
         - "remove" : On triplet deleting
     """
 
-    def __init__(self, token_size=32, salt_size=16, iterations=350000, is_portable=False):
+    def __init__(self, token_size=32, salt_size=16, iterations=350000, is_portable=False, backend="fernet"):
         FileSystem.__init__(self, salt_size, token_size, is_portable)
-        CryptoSystem.__init__(self, iterations)
+        CryptoSystem.__init__(self, iterations, backend)
 
     def verify_key(self, passphrase: str):
         """

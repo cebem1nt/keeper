@@ -122,9 +122,9 @@ Stuff i will do:
 - [x]  Event system for extensibility
 - [x]  Opening an .lk file out of working directory
 - [x]  Portable build for keeper, accessing and managing passwords on flashdrive
-- [ ]  AES encryption backend
+- [x]  AES encryption backend
 - [ ]  Option for temporary key storing, so you dont have to enter master password every time
-- [ ]  Improve git manager
+- [x]  Improve git manager (seems fine for now)
 
 May be:
 

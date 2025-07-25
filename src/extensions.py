@@ -42,10 +42,13 @@ class GitManager(Extension):
             self._keeper.subscribe('init', self.force_pull, is_multi_thread=True)
             self._keeper.subscribe('exit', self.check_and_push)
         else:
-            create_repo = input("No repo in storage dir found, would you like to create one? [Y/n] ")
-            if 'n' == create_repo.lower():
+            try:
+                create_repo = input("No repo in storage dir found, would you like to create one? [Y/n] ")
+                if 'n' == create_repo.lower():
+                    return
+                self._init_repo()
+            except Exception:
                 return
-            self._init_repo()
 
     def _init_repo(self):
         try:

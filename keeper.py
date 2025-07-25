@@ -89,7 +89,7 @@ if __name__ == '__main__':
     args = p.parse_args()
 
     keeper = Keeper(
-        params.token_size, params.salt_size, params.iterations, params.is_portable
+        params.token_size, params.salt_size, params.iterations, params.is_portable, params.backend
     )
 
     # Initializing extensions:
