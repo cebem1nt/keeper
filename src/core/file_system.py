@@ -159,8 +159,9 @@ class FileSystem(CrossPlatform):
         return lines
 
     def _append_line_to_storage(self, header: bytes, line: bytes):
+        # Every line starts from a header which is used as an identifier for the line
+        # Note: do not store raw binary data as it will break storing logic, encode it before
         with open(self.locker_file, 'ab') as f:
-            # Every line starts from a header which is used as an identifier for the line
             f.write(header+line+b'\n')
 
     def _get_line_from_storage(self, header: bytes) -> bytes | None:
