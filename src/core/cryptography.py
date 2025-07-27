@@ -1,18 +1,19 @@
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes, padding
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from cryptography.fernet import Fernet, InvalidToken
 from hashlib import sha256
 
-from base64 import urlsafe_b64encode as b64_encode, b64decode
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+
+from base64 import urlsafe_b64encode, urlsafe_b64decode
 import re, os
 
 # Main module for all cryptography stuff
-# TODO maybe try some AES backend instead of fernet
 
-def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
+def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int) -> bytes:
     # The main key derivation function. You can customize it however you want.
     # Length of derived key should be 32 bytes!
     kdf = PBKDF2HMAC(
@@ -22,7 +23,9 @@ def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int):
         iterations=itr,
         backend=default_backend()
     )
-    return b64_encode(kdf.derive(passphrase))
+    # urlsafe_b64encode actually increases key length...
+    # Now it returns raw key
+    return kdf.derive(passphrase) 
 
 
 class AESBackend:
@@ -34,33 +37,36 @@ class AESBackend:
     def init_cipher(self, passphrase: bytes, salt: bytes, token: bytes):
         derivated_key = derive_key(passphrase, salt, token, self.iterations)
         self._key = derivated_key
-        self.cipher = True  # to verify initialization
-
-    def __get_iv(self, data: bytes) -> bytes:
-        return data[:16]
+        self.cipher = True # Simplify verification later on
 
     def encrypt(self, data: str) -> bytes:
-        padder = padding.PKCS7(128).padder()
-        padded_data = padder.update(data.encode())
-        padded_data += padder.finalize()
-
         iv = os.urandom(16)
-        cipher = Cipher(algorithms.AES(self._key[:32]), modes.CBC(iv), backend=default_backend())
+        cipher = Cipher(algorithms.AES(self._key), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
-
-        cipher_text = encryptor.update(padded_data) + encryptor.finalize()
-        return cipher_text
+        
+        # Pad the given data
+        padder = padding.PKCS7(algorithms.AES.block_size).padder()
+        padded_plaintext = padder.update(data.encode('utf-8')) + padder.finalize()
+        
+        ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
+        return urlsafe_b64encode(iv + ciphertext)
 
     def decrypt(self, encrypted_data: bytes) -> str:
-        iv = encrypted_data[:16]
-        decryptor = Cipher(algorithms.AES(self._key[:32]), modes.CBC(iv), backend=default_backend()).decryptor()
-        decrypted_data = decryptor.update(encrypted_data[16:]) + decryptor.finalize()
+        encrypted_data = urlsafe_b64decode(encrypted_data)
+        iv = encrypted_data[:16]  # Extract the initial vector from the beginning
+        actual_data = encrypted_data[16:]
 
-        unpadder = padding.PKCS7(128).unpadder()
-        unpadded_data = unpadder.update(decrypted_data)
-        unpadded_data += unpadder.finalize()
+        cipher = Cipher(algorithms.AES(self._key), modes.CBC(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+        
+        # Decrypt the data
+        decrypted_padded_text = decryptor.update(actual_data) + decryptor.finalize()
+        
+        # Unpad the decrypted data
+        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
+        unpadded_text = unpadder.update(decrypted_padded_text) + unpadder.finalize()
 
-        return unpadded_data.decode()
+        return unpadded_text.decode('utf-8')
 
 
 class FernetBackend:
@@ -70,7 +76,7 @@ class FernetBackend:
 
     def init_cipher(self, passphrase: bytes, salt: bytes, token: bytes):
         derivated_key = derive_key(passphrase, salt, token, self.iterations)
-        self.cipher = Fernet(derivated_key) 
+        self.cipher = Fernet(urlsafe_b64encode(derivated_key)) 
 
     def encrypt(self, data: str) -> bytes:
         if self.cipher is None:
