@@ -37,6 +37,10 @@ active_extensions = ['GitManager']
 # Warning! Better compile it if using this param
 
 is_portable = False
+
+# Encryption backend to use, each backend encrypts passwords in different way
+# Passwords encrypted with fernet backend wont be decrypted with AES one
+backend = 'fernet' # 'AES' 
 ```
 
 ## Installation 
