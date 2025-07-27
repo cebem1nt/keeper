@@ -54,11 +54,23 @@ And run the setup script:
 
 This will compile python code using pyinstaller and move compiled file to /usr/bin/ or leave compiled file in /dist/keeper.exe
 
-*Alternatively you can run it directly:*
+*Alternatively you can run the project directly:*
 
 ```python keeper.py```
 
 ## Usage
+
+If using for the first time, then firstly run:
+
+```sh
+keeper generate-token
+```
+
+If you already have token you can put it into:
+> ~/.local/share/keeper (linux, mac, termux)
+
+> C:\Users\<Username>\AppData\Local\keeper (windows)
+
 ```$ keeper --help
 usage: keeper [-h] {add,remove,get,edit,list,search,generate,change,copy,current,shred-locker,generate-token} ...
 
