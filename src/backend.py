@@ -49,7 +49,7 @@ class Keeper(FileSystem, CryptoSystem, EventManager):
         try:
             token = self.get_token()
             if token:
-                self.init_cipher(passphrase.encode(), token, self.get_salt())
+                self.init_cipher(passphrase.encode(), self.get_salt(), token)
                 listed = self.list_triplets()
                 return True
             raise ValueError("Token wasn't generated!")
