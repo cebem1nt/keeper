@@ -37,11 +37,12 @@ class CLI:
             print("Passwords are stored in a triplet format: \033[33mtag/login/password\033[0m.") 
             print("Use the tag to retrieve detailed information about each triplet.")
             print("Lockers are encrypted with a passphrase and your unique token.")
-            print("If you want to use your lockers on multiple devices, you need the same token.")
+            print("If you want to use your lockers on multiple devices, you need the same token.\n")
 
-            print(f"\033[33m[WARNING!]\033[0m You don't have a token yet. Generate it by 'keeper generate-token'")
+            print(f'\033[33m[WARNING!]\033[0m You don\'t have a token yet. Generate it by \033[4m"keeper generate-token"\033[0m')
             print(f"or insert your existing token to {token_dir}")
-            print(f'You can get your token with "copy --token" command, then move it to {token_dir}\n')
+            print(f'You can get your token with \033[4m"keeper copy --token"\033[0m command, then move it to {token_dir}\n')
+
             print("\033[33m[WARNING!]\033[0m Make sure to remember this passphrase! as losing it")
             print("means you will not be able to recover your encrypted passwords.\n")
             
@@ -56,7 +57,7 @@ class CLI:
 
     def registrate(self):
         self.message(not self.keeper.token_exists(), self.keeper.token_file)
-        print("Current locker: ", self.keeper.get_current_locker_dir())
+        print("\nCurrent locker: ", self.keeper.get_current_locker_dir())
 
         while True:
             passphrase = getpass("Create passphrase for the locker: ")
