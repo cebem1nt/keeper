@@ -158,7 +158,7 @@ class CLI:
 
                     print("Password can not be empty!")
 
-        except KeyboardInterrupt as e:
+        except Exception as e:
             raise e
 
         self.keeper.store_triplet(tag, login, password)
@@ -329,7 +329,7 @@ class CLI:
                 else:
                     continue
 
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, EOFError):
                 print("\nExiting...")
                 break
 
@@ -401,7 +401,7 @@ class CLI:
             elif args.command == 'generate-token':
                 print('No.')
 
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             return print('\nAborting...')
 
     def main(self, args: any, parser: any = None):
@@ -417,22 +417,23 @@ class CLI:
         no_auth_commands = ('generate-token', 'change', 'current')
         self.keeper.trigger_event("init")
 
-        if args:
-            if args.command in no_auth_commands:
-                # Can be executed without any registration, because 
-                # these operations don't involve cryptography  
-
-                if args.command == 'generate-token':
-                    self.generate_token()
-                elif args.command == 'change':
-                    self.change_locker(args.dir, args.absolute)
-                else:
-                    self.print_locker(self.keeper.get_current_locker_dir(args.full))
-
-            else:                            
-                self.handle_args(args)
-        else:
+        if not args:
             self.interactive_cli(parser)
+            return 
+
+        if args.command in no_auth_commands:
+            # Can be executed without any registration, because 
+            # these operations don't involve cryptography  
+
+            if args.command == 'generate-token':
+                self.generate_token()
+            elif args.command == 'change':
+                self.change_locker(args.dir, args.absolute)
+            else:
+                self.print_locker(self.keeper.get_current_locker_dir(args.full))
+
+        else:                            
+            self.handle_args(args)
 
         self.keeper.trigger_event('exit')
 

@@ -47,7 +47,7 @@ class GitManager(Extension):
                 if 'n' == create_repo.lower():
                     return
                 self._init_repo()
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, EOFError):
                 return
 
     def _init_repo(self):

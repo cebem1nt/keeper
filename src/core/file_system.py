@@ -191,7 +191,7 @@ class FileSystem(CrossPlatform):
         except IOError as e:
             os.remove(temp_file)
             raise e
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, EOFError):
             return os.remove(temp_file)
         # If all right, we replace original file with temporary file
         os.replace(temp_file, self.locker_file)
