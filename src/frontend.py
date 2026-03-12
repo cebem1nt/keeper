@@ -3,6 +3,7 @@ import pyperclip
 from getpass import getpass
 from subprocess import run as sub_run
 from os import environ, name as os_name, system as os_system
+from typing import Any
 
 from src.backend import Keeper
 from sys import exit as sys_exit
@@ -298,7 +299,7 @@ class CLI:
         else: 
             os_system('clear')
 
-    def interactive_cli(self, parser: any):
+    def interactive_cli(self, parser: Any):
         current_locker = self.keeper.get_current_locker_dir()
 
         while True:
@@ -333,11 +334,8 @@ class CLI:
                 print("\nExiting...")
                 break
 
-            # The point of this part of this except is that when argparse successfully 
-            # parses arguments and the command gets executed, it raises SystemExit. 
-            # Though we don't want it. Well keep call argaprse as much as user wants
-            # Although we raise SystemExit to :). It should be prevented here 
-
+            # When argparse successfully parses arguments, it raises SystemExit. 
+            # Exit only if exit code == 3
             except SystemExit as e:
                 if e.code == 3:
                     return
@@ -404,16 +402,15 @@ class CLI:
         except (KeyboardInterrupt, EOFError):
             return print('\nAborting...')
 
-    def main(self, args: any, parser: any = None):
+    def main(self, args: Any, parser: Any = None):
         """
         Main entry function, used to start frontend functionality.  
         """
 
         # Given: args or None and parser. 
-        # Objective: Proper handling, of authentification, interactive cli if no args
+        # Functions: Proper handling, authentification, interactive cli if no args
 
         # Operations that can be executed without password entering
-
         no_auth_commands = ('generate-token', 'change', 'current')
         self.keeper.trigger_event("init")
 
@@ -422,8 +419,8 @@ class CLI:
             return 
 
         if args.command in no_auth_commands:
-            # Can be executed without any registration, because 
-            # these operations don't involve cryptography  
+            # Can be executed without registration, because 
+            # these operations don't involve any cryptography  
 
             if args.command == 'generate-token':
                 self.generate_token()

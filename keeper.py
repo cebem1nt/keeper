@@ -8,19 +8,13 @@ from src.frontend import Frontend
 
 import params
 
-# This is a project code for a minimalistic and at the same time 
-# functional & extensible python password manager. 
-# For sequrity reasons, it should be compiled.
-# You will need pyinstaller for it, then just run setup.py
-
-# This password manager built as a layered project, from the bottom where
-# files are getting manipulated, the medium where Keeper class provides some kind of API,
+# This password manager is built using layered like architecture, from the bottom where
+# files are manipulated, the medium where Keeper class provides some kind of API,
 # to the frontend level. Beauty of it is that you do not have to modify the base.
-# You can add some frontend functionality as a new abstract layer without any need
-# to modify file system or API. 
+# You can modify frontend functionality without any need to modify the file system or API. 
 
 # Brief tour:
-# src/      -- Source directory. Frontend, backend and extensions files are there
+# src/      -- Source directory. Frontend, backend and extensions are there
 # src/core  -- Two files with basic functionality for a password manager: cryptography and a file system
 # params.py -- You can tweak some parameters of keeper's behaviour inside of it
 
@@ -92,15 +86,14 @@ if __name__ == '__main__':
         params.token_size, params.salt_size, params.iterations, params.is_portable, params.backend
     )
 
-    # Initializing extensions:
+    # Initializing extensions
     extensions = init_extensions(keeper, params.active_extensions)
 
     # - Frontend is a variable set in frontend.py that refers to a class that implements user interface functionality
-    # - Frontend itself should implement registration / authentification handling when it's needed
+    # - Frontend itself should manage registration / authentification handling when needed
     # - Frontend's main() function should implement proper arguments handling
-    # - If there is some kind of interactive cli in frontend, it should be used and implemented by frontend as well 
-    #   - keeper.py will pass None if no arguments.
-    #   - keeper.py will also pass parser instance.
+    # - For an interactive cli: 
+    #   - keeper.py will pass None and parser instance if no arguments.
 
     frontend = Frontend(keeper=keeper)
     

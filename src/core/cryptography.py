@@ -14,7 +14,7 @@ import re, os
 # Main module for all cryptography stuff
 
 def derive_key(passphrase: bytes, salt: bytes, token: bytes, itr: int) -> bytes:
-    # The main key derivation function. You can customize it however you want.
+    # The main key derivation function.
     # Length of derived key should be 32 bytes!
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -99,25 +99,25 @@ class CryptoSystem:
     """Base cryptography class"""
 
     def __init__(self, iterations: int, backend: str = "fernet"):
-        self.backend = None
+        self.__backend = None
 
         if backend.lower() == "aes": 
-            self.backend = AESBackend(iterations)
+            self.__backend = AESBackend(iterations)
         else:
-            # Fallback to fernet silently in case if backend was incorrect
-            self.backend = FernetBackend(iterations)
+            # Fallback to fernet silently
+            self.__backend = FernetBackend(iterations)
 
     def init_cipher(self, passphrase: bytes, salt: bytes, token: bytes):
-        self.backend.init_cipher(passphrase, salt, token)
+        self.__backend.init_cipher(passphrase, salt, token)
 
     def encrypt(self, data: str) -> bytes:
-        return self.backend.encrypt(data)
+        return self.__backend.encrypt(data)
 
     def decrypt(self, encrypted_data: bytes) -> str:
-        return self.backend.decrypt(encrypted_data)
+        return self.__backend.decrypt(encrypted_data)
 
     def has_cipher(self) -> bool:
-        return self.backend.cipher != None
+        return self.__backend.cipher != None
     
     def hash(self, content: str):
         return sha256(content.encode()).hexdigest().encode()
