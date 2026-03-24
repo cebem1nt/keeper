@@ -55,9 +55,9 @@ if __name__ == '__main__':
     list_parser.add_argument('-s', '--show', action='store_true', help='Include passwords in the listing.')
     list_parser.add_argument('-n', '--num', action='store_true', help='Output number of passwords instead of printing each one.')
 
-    search_parser = subparsers.add_parser('search', help='Search for a triplets with similar tag.')
-    search_parser.add_argument('tag', metavar='TAG', type=str, help='Similar tag to search for.')
-    search_parser.add_argument('-s', '--show', action='store_true', help='Show passwords for every found triplet')
+    find_parser = subparsers.add_parser('find', help='Search for a triplets with similar tag.')
+    find_parser.add_argument('tag', metavar='TAG', type=str, help='Similar tag to search for.')
+    find_parser.add_argument('-s', '--show', action='store_true', help='Show passwords for every found triplet')
 
     generate_parser = subparsers.add_parser('generate', help="Generates a password and stores it with provided tag")
     generate_parser.add_argument('tag', metavar='TAG', type=str, help='Tag for the new triplet.')
