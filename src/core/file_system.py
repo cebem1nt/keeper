@@ -61,7 +61,8 @@ class CrossPlatform:
         # Root dir is a directory where all stuff for password manager to work will be stored
         root_dirs = {
             'Windows' : os.path.join(os.getenv('LOCALAPPDATA', user_root), 'keeper'),
-            'Linux'   : os.path.expanduser('~/.local/share/keeper'), 
+            'Linux'   : os.path.expanduser('~/.local/share/keeper'),
+            'Android'  : os.path.expanduser('~/.local/share/keeper'),
             'Darwin'  : os.path.expanduser('~/.local/share/keeper'),
             'Portable': os.path.join(script_dir, 'data'),
         }
