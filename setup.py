@@ -33,7 +33,7 @@ try:
         case 'Windows':
             script = 'setup_win.bat'
 
-        case 'Darwin' | 'Linux':
+        case 'Darwin' | 'Linux' | 'Android':
             if 'TERMUX_VERSION' in os.environ:
                 script = 'bash setup_linux.sh -t'
                 termux = True
