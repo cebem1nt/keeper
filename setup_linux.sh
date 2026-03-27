@@ -13,10 +13,10 @@ if [ -f "dist/keeper" ]; then
     echo "Compilation successful"
     
     if [ "$TERMUX" = true ]; then
-        mv dist/keeper $PATH
+        cp dist/keeper $PATH
         echo "Executable added to $PATH."
     else
-        sudo mv dist/keeper /usr/bin/keeper
+        sudo cp dist/keeper /usr/bin/keeper
         echo "Executable added to /usr/bin."
     fi
 else

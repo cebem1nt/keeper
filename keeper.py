@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from argparse import ArgumentParser
 from sys import exit as sys_exit
 from os import system as os_system
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     list_parser.add_argument('-s', '--show', action='store_true', help='Include passwords in the listing.')
     list_parser.add_argument('-n', '--num', action='store_true', help='Output number of passwords instead of printing each one.')
 
-    find_parser = subparsers.add_parser('find', help='Search for a triplets with similar tag.')
+    find_parser = subparsers.add_parser('find', help='Search for triplets with similar tag.')
     find_parser.add_argument('tag', metavar='TAG', type=str, help='Similar tag to search for.')
     find_parser.add_argument('-s', '--show', action='store_true', help='Show passwords for every found triplet')
 

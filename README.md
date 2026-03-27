@@ -4,7 +4,7 @@ Keeper is a local cli password manager writen in python. Keeper is oriented to e
 
 ## Tweaking
 
-Before installation, you can tweak your build by modifying ```params.py```
+Before installation, you can tweak your build by modifying `params.py`
 
 ```py
 # Number of iterations used to generate unique key.
@@ -21,26 +21,23 @@ token_size = 32
 
 # Same but size of the salt that's added at the beginning of each locker.
 # Warning! In case if locker's salt is less than number passed, will lead to
-# unexpected and fatal errors.
-# Optimal size: 16 to 32 
+# unexpected and fatal errors. Optimal size: 16 to 32 
 salt_size = 16
 
 # Extensions that are included in build. Leave list empty to disable any
 active_extensions = ['GitManager']
 
-# Portable build. Will look for token, lokers in the directory
-# where the script is located.
-# Data like token should be located in keepr_dir/data/
-# .lk files should be located in keeper_dir/storage
+# Portable build. Will look for token, lokers in the 
+# same directory where the script is located.
+# Token should be in <keepr_dir>/data/
+# .lk files should be in <keeper_dir>/storage
 # Where keper_dir is the location where executable is located
-
-# Warning! Better compile it if using this param
 
 is_portable = False
 
 # Encryption backend to use, each backend encrypts passwords in different way
 # Passwords encrypted with fernet backend wont be decrypted with AES one
-backend = 'fernet' # 'AES' 
+backend = 'fernet' # or 'AES' 
 ```
 
 ## Installation 
@@ -50,24 +47,28 @@ Just clone the repo:
 ```sh
 git clone https://github.com/cebem1nt/keeper.git
 cd keeper
+python setup.py
 ```
 
-And run the setup script:
+This will compile python code using pyinstaller and move the executable to `/usr/bin/` or leave it in `/dist/keeper`
 
-```python setup.py```
+> [!WARNING]
+> Pyinstaller is very easy to decompile, use on your own risk
 
-This will compile python code using pyinstaller and move compiled file to /usr/bin/ or leave compiled file in /dist/keeper.exe
+### Direct usage
 
-*Alternatively you can run the project directly:*
+Ensure you have `pyperclip` and `cryptography` installed, then just run `keeper.py`
 
-```python keeper.py```
+```sh
+python keeper.py
+```
 
 ## Usage
 
 If using for the first time, then firstly run:
 
 ```sh
-keeper generate-token
+python keeper.py generate-token
 ```
 
 If you already have token you can put it into:
@@ -75,22 +76,22 @@ If you already have token you can put it into:
 >
 > C:\Users\<Username>\AppData\Local\keeper (windows)
 
-```
-$ keeper --help
-usage: keeper [-h] {add,remove,get,edit,list,search,generate,change,copy,current,shred-locker,generate-token} ...
+### Usage
 
-Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen
-by adding -h to the command.
+```
+usage: keeper.py [-h] {add,remove,get,edit,list,find,generate,change,copy,current,shred-locker,generate-token} ...
+
+Keeper is a Python password manager. Locker is a .lk file where passwords are stored, triplet is tag/login/password. More detailed info about each command can be seen by adding -h to the command, for example "keeper add -h"
 
 positional arguments:
-  {add,remove,get,edit,list,search,generate,change,copy,current,shred-locker,generate-token}
+  {add,remove,get,edit,list,find,generate,change,copy,current,shred-locker,generate-token}
                         Available commands
     add                 Add a new triplet with provided tag or tags.
     remove              Remove a triplet based on tag or tags.
     get                 Retrieve login or password based on tag.
     edit                Interactively edit parameters of a triplet.
     list                List all stored triplets.
-    search              Search for a triplets with similar tag.
+    find                Search for triplets with similar tag.
     generate            Generates a password and stores it with provided tag
     change              Changes current locker file to provided.
     copy                Copy current .lk or token file to the provided directory.
@@ -146,6 +147,7 @@ Stuff i will do:
 May be:
 
 - Visual interface
+
 ## What is done
 
 - All the main functionality: Searching, adding, editting, getting, removing passwords 

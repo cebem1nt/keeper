@@ -12,23 +12,20 @@ token_size = 32
 
 # Same but size of the salt that's added at the beginning of each locker.
 # Warning! In case if locker's salt is less than number passed, will lead to
-# unexpected and fatal errors.
-# Optimal size: 16 to 32 
+# unexpected and fatal errors. Optimal size: 16 to 32 
 salt_size = 16
 
 # Extensions that are included in build. Leave list empty to disable any
 active_extensions = ['GitManager']
 
-# Portable build. Will look for token, lokers in the directory
-# where the script is located.
-# Data like token should be located in keepr_dir/data/
-# .lk files should be located in keeper_dir/storage
+# Portable build. Will look for token, lokers in the 
+# same directory where the script is located.
+# Token should be in <keepr_dir>/data/
+# .lk files should be in <keeper_dir>/storage
 # Where keper_dir is the location where executable is located
-
-# Warning! Better compile it if using this param
 
 is_portable = False
 
 # Encryption backend to use, each backend encrypts passwords in different way
 # Passwords encrypted with fernet backend wont be decrypted with AES one
-backend = 'fernet' # 'AES' 
+backend = 'fernet' # or 'AES' 
