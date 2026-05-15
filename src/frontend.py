@@ -416,21 +416,18 @@ class CLI:
 
         if not args:
             self.interactive_cli(parser)
-            return 
+        
+        else:
+            if args.command in no_auth_commands:
+                if args.command == 'generate-token':
+                    self.generate_token()
+                elif args.command == 'change':
+                    self.change_locker(args.dir, args.absolute)
+                else:
+                    self.print_locker(self.keeper.get_current_locker_dir(args.full))
 
-        if args.command in no_auth_commands:
-            # Can be executed without registration, because 
-            # these operations don't involve any cryptography  
-
-            if args.command == 'generate-token':
-                self.generate_token()
-            elif args.command == 'change':
-                self.change_locker(args.dir, args.absolute)
             else:
-                self.print_locker(self.keeper.get_current_locker_dir(args.full))
-
-        else:                            
-            self.handle_args(args)
+                self.handle_args(args)
 
         self.keeper.trigger_event('exit')
 
