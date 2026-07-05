@@ -62,7 +62,7 @@ class CrossPlatform:
         root_dirs = {
             'Windows' : os.path.join(os.getenv('LOCALAPPDATA', user_root), 'keeper'),
             'Linux'   : os.path.expanduser('~/.local/share/keeper'),
-            'Android'  : os.path.expanduser('~/.local/share/keeper'),
+            'Android' : os.path.expanduser('~/.local/share/keeper'),
             'Darwin'  : os.path.expanduser('~/.local/share/keeper'),
             'Portable': os.path.join(script_dir, 'data'),
         }

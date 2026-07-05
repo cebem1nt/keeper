@@ -133,7 +133,7 @@ class CLI:
     def add_triplet(self, tag: str, do_show_password=False, password=None):
         if self.keeper.get_triplet(tag):
             print(f"Triplet with tag '{tag}' already exists.\n")
-            return 0
+            return -1
 
         print(f'\nCreating new triplet with tag "{tag}"\n')
 
@@ -270,18 +270,19 @@ class CLI:
         except:
             print(f"Could not find destination dir: {dest}")
 
-    def generate_password_and_store(self, tag: str, length: int, 
-        no_syms: bool, no_letters: bool, do_not_paste=False):
-        generated_password = self.keeper.generate_password(length, no_syms, no_letters)
+    def generate_password(self, tag: str, length: int, no_syms: bool, no_letters: bool, do_not_paste=False):
+        generated = self.keeper.generate_password(length, no_syms, no_letters)
         
-        if self.add_triplet(tag, password=generated_password) == 0:
+        if not tag:
+            print(generated)
+
+        elif self.add_triplet(tag, password=generated) == -1:
             return
 
-        if not do_not_paste:
-            add_to_clipboard(generated_password)
-            print("Generated password added to the clipboard!")
-        else:
+        if do_not_paste and tag:
             print(f"Password is generated and stored with the tag: {tag}")
+        else:
+            add_to_clipboard(generated)
 
     def generate_token(self):
         print("Generating token...")
@@ -370,9 +371,9 @@ class CLI:
             elif args.command == 'get':
                 tag = args.tag
                 if args.login:
-                    self.get_login(tag, args.print_stdout)
+                    self.get_login(tag, args.print)
                 else:
-                    self.get_password(tag, args.print_stdout)
+                    self.get_password(tag, args.print)
 
             elif args.command == 'edit':
                 for t in args.tag:
@@ -393,8 +394,7 @@ class CLI:
                 self.delete_locker()
 
             elif args.command == 'generate':
-                tag = args.tag
-                self.generate_password_and_store(tag, args.length, args.no_symbols, args.no_letters, args.no_paste)
+                self.generate_password(args.store, args.length, args.no_symbols, args.no_letters, args.no_paste)
 
             elif args.command == 'generate-token':
                 print('No.')
