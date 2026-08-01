@@ -279,9 +279,7 @@ class CLI:
         elif self.add_triplet(tag, password=generated) == -1:
             return
 
-        if do_not_paste and tag:
-            print(f"Password is generated and stored with the tag: {tag}")
-        else:
+        if not do_not_paste:
             add_to_clipboard(generated)
 
     def generate_token(self):
@@ -411,7 +409,8 @@ class CLI:
         # Functions: Proper handling, authentification, interactive cli if no args
 
         # Operations that can be executed without password entering
-        no_auth_commands = ('generate-token', 'change', 'current')
+        no_auth_commands = ('generate-token', 'change', 'current', 'generate')
+        
         self.keeper.trigger_event("init")
 
         if not args:
@@ -419,10 +418,15 @@ class CLI:
         
         else:
             if args.command in no_auth_commands:
+                
                 if args.command == 'generate-token':
                     self.generate_token()
                 elif args.command == 'change':
                     self.change_locker(args.dir, args.absolute)
+                elif args.command == 'generate':
+                    if args.store: 
+                        self.auth()
+                    self.generate_password(args.store, args.length, args.no_symbols, args.no_letters, args.no_paste)
                 else:
                     self.print_locker(self.keeper.get_current_locker_dir(args.full))
 
