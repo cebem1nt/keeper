@@ -1,4 +1,5 @@
 import pyperclip
+import readline # Holy moly, this one litterally fixes an enormous interactive shell problem
 
 from getpass import getpass
 from subprocess import run as sub_run
