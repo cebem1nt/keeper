@@ -195,7 +195,7 @@ class CLI:
             add_to_clipboard(triplet[1])
             print("Login added to the clipboard!")
 
-    def search(self, tag: str, do_show: bool):
+    def find(self, tag: str, do_show: bool):
         found = self.keeper.search_for_triplet(tag)
         self.print_triplets(found, not do_show)
         del found
@@ -385,8 +385,8 @@ class CLI:
                     self.print_triplets(items, not args.show)
                 del items
 
-            elif args.command == 'search':
-                self.search(args.tag, args.show)
+            elif args.command == 'find':
+                self.find(args.tag, args.show)
 
             elif args.command == 'shred-locker':
                 self.delete_locker()
