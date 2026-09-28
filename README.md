@@ -2,6 +2,8 @@
 
 Keeper is a local cli password manager writen in python. Keeper is oriented to extensibility and simplicity in code changing, while at the same time offering a good level of sequrity by default. 
 
+Not maintained anymore, see [ceeper](https://github.com/cebem1nt/ceeper)
+
 ## Tweaking
 
 Before installation, you can tweak your build by modifying `params.py`
